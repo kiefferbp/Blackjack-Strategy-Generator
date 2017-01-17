@@ -10,28 +10,19 @@ public class Deck {
 
     // creates a shuffled deck of playing cards
     Deck() {
-        final Map<Card, Integer> cardCounts = new HashMap<>(); // maps cards (ignoring suit) to the appearance count
+        final List<Card> deck = new ArrayList<>();
 
-        // this isn't very efficient...
-        while (mCards.size() < CARDS_PER_DECK) {
-            final Card card = Card.getRandomCard();
-
-            // we only want four cards of each rank in our deck
-            // (e.g., a deck can't have five aces)
-            if (cardCounts.get(card) == MAX_CARDS_PER_RANK) {
-                continue;
+        // push four of each of 2, 3, ..., 10, J/Q/K, A in order to the deck
+        for (int i = 0; i < MAX_CARDS_PER_RANK; i++) {
+            for (Card card : Card.values()) {
+                deck.add(card);
             }
+        }
 
-            // at this point, we can add the card to the deck
+        // shuffle the list and init the card stack with it
+        Collections.shuffle(deck);
+        for (Card card : deck) {
             mCards.push(card);
-
-            // update the number of times this card appears in the deck
-            if (cardCounts.containsKey(card)) {
-                final int oldCount = cardCounts.get(card);
-                cardCounts.put(card, oldCount + 1);
-            } else {
-                cardCounts.put(card, 1);
-            }
         }
     }
 }

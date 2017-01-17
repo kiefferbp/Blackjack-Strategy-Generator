@@ -23,9 +23,4 @@ public enum Card {
     public int getValue() {
         return mValue;
     }
-
-    public static Card getRandomCard() {
-        final Card[] cards = values();
-        return cards[(int) (Math.random() * cards.length)];
-    }
 }
