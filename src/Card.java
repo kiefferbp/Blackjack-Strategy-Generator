@@ -12,15 +12,17 @@ public enum Card {
     NINE (9),
     TEN (10),
     KING (10),
+    QUEEN (10),
+    JACK (10),
     ACE (11); // assuming soft hand
 
-    private int mValue;
+    private int value;
 
     Card(int value) {
-       mValue = value;
+       this.value = value;
     }
 
     public int getValue() {
-        return mValue;
+        return value;
     }
 }
