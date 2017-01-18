@@ -56,4 +56,8 @@ public class Shoe {
             shoe.push(card);
         }
     }
+
+    public Card removeCard() {
+        return shoe.pop();
+    }
 }
