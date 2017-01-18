@@ -19,10 +19,20 @@ public enum Card {
     private int value;
 
     Card(int value) {
-       this.value = value;
+        this.value = value;
     }
 
     public int getValue() {
         return value;
+    }
+
+    public static Card getCardWithValue(int target) {
+        for (Card card : values()) {
+            if (card.getValue() == target) {
+                return card;
+            }
+        }
+
+        return null;
     }
 }
