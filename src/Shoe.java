@@ -4,9 +4,6 @@ import java.util.*;
  * Created by Brian on 1/17/2017.
  */
 public class Shoe {
-    private int playerValue;
-    private int dealerValue;
-    private double penetrationValue;
     private final Stack<Card> shoe = new Stack<>();
 
     // generates a shoe with the given parameters
