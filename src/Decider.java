@@ -26,8 +26,9 @@ public class Decider {
                 .build();
     }
 
-    // returns true if the player wins this scenario
-    private PlayResult performSimulation(Scenario scenario, Decision decision) {
+    // returns the PlayResult of what happens if the player stands under this scenario
+    private PlayResult performStandSimulation(Scenario scenario) {
+        final int playerValue = scenario.playerValue;
         final Shoe shoe = buildShoe();
         final Card holeCard = shoe.removeCard();
         int currentDealerValue = scenario.dealerValue + holeCard.getValue();
@@ -67,6 +68,7 @@ public class Decider {
 
         }
     }
+
     Decider(int playerValue, int dealerValue, int deckCount, double penetrationValue, boolean isSoft, boolean isPair) {
         // set member variables
         this.playerValue = playerValue;
