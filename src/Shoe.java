@@ -36,6 +36,10 @@ public class Shoe {
         return shoe.pop();
     }
 
+    public Card peekTopCard() {
+        return shoe.peek();
+    }
+
     public boolean removeCard(Card card) {
         return shoe.remove(card);
     }

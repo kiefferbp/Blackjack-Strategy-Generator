@@ -93,6 +93,12 @@ public class Decider {
             return getShoePlayerHandPair(deckCount, penetrationValue, scenario);
         }
 
+        // if the dealer has an Ace or a 10-valued card, the card at the top of the shoe cannot give him Blackjack
+        if ((scenario.dealerCard.equals(Card.ACE) && shoe.peekTopCard().getValue() == 10) ||
+                (scenario.dealerCard.getValue() == 10 && shoe.peekTopCard().equals(Card.ACE))) {
+            // retry
+            return getShoePlayerHandPair(deckCount, penetrationValue, scenario);
+        }
         return new Object[]{shoe, playerCards};
     }
 
@@ -224,10 +230,10 @@ public class Decider {
     public static void main(String[] args) throws Exception {
         Decider d = new Decider();
         Scenario scenario = new Scenario();
-        scenario.playerValue = 16;
+        scenario.playerValue = 21;
         scenario.isPlayerSoft = false;
         scenario.isPair = false;
-        scenario.dealerCard = Card.NINE;
+        scenario.dealerCard = Card.TWO;
 
         DecisionValuePair p = d.computeBestScenarioResult(scenario, false);
         if (p.getDecision().equals(Decision.HIT)) {
