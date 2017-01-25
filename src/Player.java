@@ -9,16 +9,6 @@ public class Player {
     private List<Card> cards = new ArrayList<>();
     private int aceCount = 0;
 
-    public Card addCard(Card card) {
-        cards.add(card);
-
-        if (card.equals(Card.ACE)) {
-            aceCount += 1;
-        }
-
-        return card;
-    }
-
     private int getHandValueWithoutAces() {
         int valueWithNoAces = 0;
         for (Card card : cards) {
@@ -28,6 +18,20 @@ public class Player {
         }
 
         return valueWithNoAces;
+    }
+
+    public List<Card> getCards() {
+        return cards;
+    }
+
+    public Card addCard(Card card) {
+        cards.add(card);
+
+        if (card.equals(Card.ACE)) {
+            aceCount += 1;
+        }
+
+        return card;
     }
 
     public boolean handIsSoft() {
@@ -40,7 +44,7 @@ public class Player {
 
         // Explanation: the hand is soft if at least one ace can count as an 11 (e.g., an ace can contribute 10 more points).
         // Since the value of a hand must be <= 21, this can only occur if the total when counting aces as 1's is <= 11.
-        return (valueWithNoAces + aceCount <= 11);
+        return (aceCount >= 1 && valueWithNoAces + aceCount <= 11);
     }
 
     public Card hit(Shoe shoe) {

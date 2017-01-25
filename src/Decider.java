@@ -1,11 +1,20 @@
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Created by Brian on 1/17/2017.
  */
 public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
+    private static final int threadCount = Runtime.getRuntime().availableProcessors();
+    private static final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
     private final Map<Scenario, HashMap<Decision, Double>> expectedValues = new HashMap<>();
 
     private int playerValue;
@@ -15,6 +24,44 @@ public class Decider {
     private boolean isSoft;
     private boolean isPair;
 
+    // returns a random hand with the given value with the given softness
+    // NOTE: the caller must verify that this hand is valid for a given shoe
+    // (e.g., generateHand(21, false) may give [3, 3, 3, 3, 3, 6] which has too many 3's for one deck
+    private List<Card> generateHandWithValue(final int value, final boolean isSoft) throws Exception {
+        //final int threadCount = Runtime.getRuntime().availableProcessors();
+        //final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
+        Callable<List<Card>> task = new Callable<List<Card>>() {
+            @Override
+            public List<Card> call() throws Exception {
+                Player player = new Player();
+                //System.out.println("beginning loop. player value: " + player.getHandValue());
+
+                while (player.getHandValue() != value || player.handIsSoft() != isSoft) {
+                    final Card randomCard = Card.getRandom();
+                    player.addCard(randomCard);
+                    //System.out.println("added card " + randomCard + ". new value: " + player.getHandValue());
+
+                    if (player.getHandValue() > 21) {
+                        //System.out.println("over 21. resetting.");
+                        player = new Player(); // very, very dirty
+                    }
+                }
+
+                return player.getCards();
+            }
+        };
+
+        List<Callable<List<Card>>> taskList = new ArrayList<>();
+        for (int i = 0; i < threadCount; i++) {
+            taskList.add(task);
+        }
+
+        List<Card> result = executor.invokeAny(taskList);
+        return result;
+    }
+
+    /*
     private Shoe buildShoe() {
         return new ShoeBuilder()
                 .setPlayerValue(playerValue)
@@ -91,5 +138,28 @@ public class Decider {
                 final Shoe shoe = buildShoe();
             }
         }
+    }
+
+    */
+
+    public static void main(String[] args) throws Exception {
+        //System.out.println("generating a hard 16...");
+        final long startTime = System.nanoTime();
+        Decider decider = new Decider();
+
+        for (int i = 0; i < 1000000; i++) {
+            List<Card> hand = decider.generateHandWithValue(16, false);
+            System.out.print("Computing hand " + i + " of 1000000...\r");
+        }
+
+        /*StringBuilder result = new StringBuilder();
+
+        for (Card card : hand) {
+            result.append(card.toString() + " ");
+        }*/
+
+        //System.out.println("result: " + result);
+        final long endTime = System.nanoTime();
+        System.out.print("finished generating 1M hands. avg computation time per 1K hands: " + (endTime - startTime)/1000000000 + "ms\r");
     }
 }
