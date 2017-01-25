@@ -4,7 +4,8 @@ import java.util.*;
  * Created by Brian on 1/17/2017.
  */
 public class Shoe {
-    private final Stack<Card> shoe = new Stack<>();
+    private Stack<Card> shoe = new Stack<>();
+    private final Stack<Card> originalShoe = new Stack<>();
 
     // generates a shoe with the given parameters
     Shoe(int deckCount, double penetrationValue) {
@@ -20,6 +21,15 @@ public class Shoe {
         for (int i = 0; i < numCardsToRemove; i++) {
             removeTopCard();
         }
+
+        // create a copy of the shoe
+        originalShoe.addAll(shoe);
+    }
+
+    public Shoe reset() {
+        shoe = originalShoe;
+
+        return this;
     }
 
     public Card removeTopCard() {

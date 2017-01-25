@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -8,6 +9,13 @@ import java.util.List;
 public class Player {
     private List<Card> cards = new ArrayList<>();
     private int aceCount = 0;
+    private Shoe shoe;
+
+    Player() {} // for construction purposes
+
+    Player(Shoe shoe) {
+        this.shoe = shoe;
+    }
 
     private int getHandValueWithoutAces() {
         int valueWithNoAces = 0;
@@ -34,6 +42,14 @@ public class Player {
         return card;
     }
 
+    public List<Card> addAllCards(Collection<? extends Card> cardsToAdd) {
+        for (Card cardToAdd : cardsToAdd) {
+            addCard(cardToAdd);
+        }
+
+        return cards;
+    }
+
     public boolean handIsSoft() {
         // compute the value of the dealer's hand without any aces
         final int valueWithNoAces = getHandValueWithoutAces();
@@ -47,8 +63,8 @@ public class Player {
         return (aceCount >= 1 && valueWithNoAces + aceCount <= 11);
     }
 
-    public Card hit(Shoe shoe) {
-        Card cardObtained = shoe.removeCard();
+    public Card hit() {
+        Card cardObtained = shoe.removeTopCard();
         addCard(cardObtained);
 
         return cardObtained;

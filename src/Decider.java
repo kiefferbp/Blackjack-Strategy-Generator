@@ -95,10 +95,10 @@ public class Decider {
     }
 
     // simulates and returns the PlayResult that occurs when standing under a scenario
-    private PlayResult simulateStanding(Player player, Player dealer, Shoe shoe, boolean dealerHitsSoft17) throws Exception {
+    private PlayResult simulateStanding(Player player, Player dealer, boolean dealerHitsSoft17) throws Exception {
         // play out the dealer's hand
         while (dealer.getHandValue() < 17 || (dealer.getHandValue() == 17 && dealer.handIsSoft() && dealerHitsSoft17)) {
-            dealer.hit(shoe);
+            dealer.hit();
         }
 
         // determine the result
@@ -113,34 +113,108 @@ public class Decider {
         }
     }
 
-    // for memoization
-    Map<Scenario, Double> expectedHitMap = new HashMap<>();
-    private double getExpectedHitValue(Player player, Player dealer, Shoe shoe, boolean dealerHitsSoft17) throws Exception {
-        Scenario currentScenario = new Scenario();
-        currentScenario.playerValue = player.getHandValue();
-        currentScenario.dealerCard = Card.getCardWithValue(dealer.getHandValue());
-        currentScenario.isPlayerSoft = player.handIsSoft();
-        currentScenario.isPair = false; // for now
+    Map<Scenario, Double> expectedHitMap = new HashMap<>(); // for memoization
+    private double getExpectedHitValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+        if (expectedHitMap.get(scenario) != null) {
+            return expectedHitMap.get(scenario);
+        }
 
         // base case: the player is guaranteed to bust if he hits a hard 21
-        if (player.getHandValue() == 21 && !player.handIsSoft()) {
-            expectedHitMap.put(currentScenario, -1.0);
+        if (scenario.playerValue == 21 && !scenario.isPlayerSoft) {
+            expectedHitMap.put(scenario, -1.0);
             return -1.0;
         }
 
-        // take a hit
-        player.hit(shoe);
+        int unitsWon = 0;
+        for (int i = 0; i < SIMULATION_COUNT; i++) {
+            // generate a random shoe and player hand under this scenario
+            final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
+            final Shoe shoe = (Shoe) shoePlayerHandPair[0];
+            final Player player = new Player(shoe);
+            final Player dealer = new Player(shoe);
+            final List<Card> playerHand = (List<Card>) shoePlayerHandPair[1];
+            dealer.addCard(scenario.dealerCard);
+            player.addAllCards(playerHand);
 
-        // did we bust?
+            // take a hit
+            player.hit();
 
-        final Player player = new Player();
-        final Object[] handShoePair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
-        final Shoe shoe = (Shoe) handShoePair[0];
-        final List<Card> playerHand = (List<Card>) handShoePair[1];
+            // did we bust?
+            if (player.getHandValue() > 21) {
+                unitsWon -= 1;
+            } else { // inductive step: get the expected value of the best strategy with the new hand
+                Scenario newScenario = buildScenario(player, dealer);
+                unitsWon += computeBestScenarioResult(newScenario, dealerHitsSoft17).getValue();
+            }
+        }
 
+        final double expectedWinnings = unitsWon / SIMULATION_COUNT;
+        expectedHitMap.put(scenario, expectedWinnings);
+        return expectedWinnings;
+    }
+
+    Map<Scenario, Double> expectedStandMap = new HashMap<>(); // for memoization
+    private double getExpectedStandValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+        if (expectedStandMap.get(scenario) != null) {
+            return expectedStandMap.get(scenario);
+        }
+
+        int unitsWon = 0;
+        for (int i = 0; i < SIMULATION_COUNT; i++) {
+            // generate a random shoe and player hand under this scenario
+            final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
+            final Shoe shoe = (Shoe) shoePlayerHandPair[0];
+            final Player player = new Player(shoe);
+            final Player dealer = new Player(shoe);
+            final List<Card> playerHand = (List<Card>) shoePlayerHandPair[1];
+            dealer.addCard(scenario.dealerCard);
+            player.addAllCards(playerHand);
+
+            // play this scenario out
+            final PlayResult result = simulateStanding(player, dealer, dealerHitsSoft17);
+
+            if (result.equals(PlayResult.WIN)) {
+                unitsWon += 1;
+            }
+
+            if (result.equals(PlayResult.LOSE)) {
+                unitsWon -= 1;
+            }
+        }
+
+        final double expectedWinnings = unitsWon / SIMULATION_COUNT;
+        expectedStandMap.put(scenario, expectedWinnings);
+        return expectedWinnings;
+    }
+
+    public DecisionValuePair computeBestScenarioResult(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+        final double expectedHitValue = getExpectedHitValue(scenario, dealerHitsSoft17);
+        final double expectedStandValue = getExpectedStandValue(scenario, dealerHitsSoft17);
+
+        if (expectedHitValue > expectedStandValue) {
+            return new DecisionValuePair(Decision.HIT, expectedHitValue);
+        }
+
+        return new DecisionValuePair(Decision.STAND, expectedStandValue);
     }
 
     private Map<Scenario, Map<Decision, Double>> computeExpectedValues() {
+        return null;
+    }
 
+    public static void main(String[] args) throws Exception {
+        Decider d = new Decider();
+        Scenario scenario = new Scenario();
+        scenario.playerValue = 21;
+        scenario.isPlayerSoft = false;
+        scenario.isPair = false;
+        scenario.dealerCard = Card.ACE;
+
+        DecisionValuePair p = d.computeBestScenarioResult(scenario, false);
+        if (p.getDecision().equals(Decision.HIT)) {
+            System.out.println("HIT");
+        } else {
+            System.out.println("STAND, " + p.getValue());
+        }
     }
 }
