@@ -89,4 +89,10 @@ public class Player {
 
         return handValue;
     }
+
+    @Override
+    public String toString() {
+        final String handType = (handIsSoft() ? "Soft" : "Hard");
+        return handType + " " + getHandValue();
+    }
 }

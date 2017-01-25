@@ -20,7 +20,9 @@ public class Decider {
     private int deckCount = 4;
     private double penetrationValue = 1.0;
 
-
+    public static void shutDownThreads() {
+        executor.shutdownNow();
+    }
 
     // returns a random hand with the given value with the given softness
     // NOTE: the caller must verify that this hand is valid for a given shoe.
@@ -125,7 +127,7 @@ public class Decider {
             return -1.0;
         }
 
-        int unitsWon = 0;
+        double unitsWon = 0;
         for (int i = 0; i < SIMULATION_COUNT; i++) {
             // generate a random shoe and player hand under this scenario
             final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
@@ -159,7 +161,11 @@ public class Decider {
             return expectedStandMap.get(scenario);
         }
 
-        int unitsWon = 0;
+        double unitsWon = 0;
+        // debug
+        int wins = 0;
+        int pushes = 0;
+        int losses = 0;
         for (int i = 0; i < SIMULATION_COUNT; i++) {
             // generate a random shoe and player hand under this scenario
             final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
@@ -174,15 +180,28 @@ public class Decider {
             final PlayResult result = simulateStanding(player, dealer, dealerHitsSoft17);
 
             if (result.equals(PlayResult.WIN)) {
+                //System.out.println("I won");
                 unitsWon += 1;
+                wins += 1;
             }
 
             if (result.equals(PlayResult.LOSE)) {
+                //System.out.println("I lost");
                 unitsWon -= 1;
+                losses += 1;
             }
+
+            if (result.equals(PlayResult.PUSH)) {
+                //System.out.println("I pushed");
+                pushes += 1;
+            }
+
+            System.out.println("wins: " + wins + ", pushes: " + pushes + ", losses: " + losses);
         }
 
         final double expectedWinnings = unitsWon / SIMULATION_COUNT;
+
+        System.out.println("standing result (" + scenario + "): " + expectedWinnings);
         expectedStandMap.put(scenario, expectedWinnings);
         return expectedWinnings;
     }
@@ -205,16 +224,18 @@ public class Decider {
     public static void main(String[] args) throws Exception {
         Decider d = new Decider();
         Scenario scenario = new Scenario();
-        scenario.playerValue = 21;
+        scenario.playerValue = 16;
         scenario.isPlayerSoft = false;
         scenario.isPair = false;
-        scenario.dealerCard = Card.ACE;
+        scenario.dealerCard = Card.NINE;
 
         DecisionValuePair p = d.computeBestScenarioResult(scenario, false);
         if (p.getDecision().equals(Decision.HIT)) {
-            System.out.println("HIT");
+            System.out.println(scenario + " best strategy: HIT (" + p.getValue() + ")");
         } else {
-            System.out.println("STAND, " + p.getValue());
+            System.out.println(scenario + " best strategy: STAND (" + p.getValue() + ")");
         }
+
+        Decider.shutDownThreads();
     }
 }
