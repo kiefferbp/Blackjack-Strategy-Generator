@@ -3,7 +3,7 @@
  */
 public class Scenario {
     public int playerValue;
-    public int dealerValue;
+    public Card dealerCard;
     public boolean isPlayerSoft;
-    public boolean isDealerSoft;
+    public boolean isPair;
 }
