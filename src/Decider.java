@@ -15,7 +15,6 @@ public class Decider {
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
 
     private static final ExecutorService executorHands = Executors.newFixedThreadPool(threadCount);
-    private static final ExecutorService executorHit = Executors.newFixedThreadPool(threadCount);
     private static final ExecutorService executorStand = Executors.newFixedThreadPool(threadCount);
 
     private final Map<Scenario, HashMap<Decision, Double>> expectedValues = new HashMap<>();
@@ -25,7 +24,6 @@ public class Decider {
 
     public static void shutDownThreads() {
         executorHands.shutdownNow();
-        executorHit.shutdownNow();
         executorStand.shutdownNow();
     }
 
@@ -33,32 +31,27 @@ public class Decider {
     // NOTE: the caller must verify that this hand is valid for a given shoe.
     // (e.g., generateHand(21, false) may give [3, 3, 3, 3, 3, 6] which has too many 3's for one deck)
     private List<Card> generateHandWithValue(final int value, final boolean isSoft) throws Exception {
-        Callable<List<Card>> task = new Callable<List<Card>>() {
-            @Override
-            public List<Card> call() throws Exception {
-                Player player = new Player();
+        Callable<List<Card>> task = () -> {
+            Player player = new Player();
 
-                while (player.getHandValue() != value || player.handIsSoft() != isSoft) {
-                    final Card randomCard = Card.getRandom();
-                    player.addCard(randomCard);
+            while (player.getHandValue() != value || player.handIsSoft() != isSoft) {
+                final Card randomCard = Card.getRandom();
+                player.addCard(randomCard);
 
-                    if (player.getHandValue() > 21) {
-                        player = new Player(); // very, very dirty
-                    }
+                if (player.getHandValue() > 21) {
+                    player = new Player(); // very, very dirty
                 }
-
-                return player.getCards();
             }
+
+            return player.getCards();
         };
 
         List<Callable<List<Card>>> taskList = new ArrayList<>();
         for (int i = 0; i < threadCount; i++) {
             taskList.add(task);
         }
-
-        //System.out.println("before pair");
+        
         List<Card> result = executorHands.invokeAny(taskList);
-        //System.out.println("after pair");
         return result;
     }
 
@@ -174,50 +167,47 @@ public class Decider {
             return expectedStandMap.get(scenario);
         }
 
-        final Callable<Double> task = new Callable<Double>() {
-            @Override
-            public Double call() throws Exception {
-                double unitsWon = 0;
-                // debug
-                int wins = 0;
-                int pushes = 0;
-                int losses = 0;
+        final Callable<Double> task = () -> {
+            double unitsWon = 0;
+            // debug
+            int wins = 0;
+            int pushes = 0;
+            int losses = 0;
 
-                for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
-                    // generate a random shoe and player hand under this scenario
-                    final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
-                    final Shoe shoe = (Shoe) shoePlayerHandPair[0];
-                    final Player player = new Player(shoe);
-                    final Player dealer = new Player(shoe);
-                    final List<Card> playerHand = (List<Card>) shoePlayerHandPair[1];
-                    dealer.addCard(scenario.dealerCard);
-                    player.addAllCards(playerHand);
+            for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
+                // generate a random shoe and player hand under this scenario
+                final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
+                final Shoe shoe = (Shoe) shoePlayerHandPair[0];
+                final Player player = new Player(shoe);
+                final Player dealer = new Player(shoe);
+                final List<Card> playerHand = (List<Card>) shoePlayerHandPair[1];
+                dealer.addCard(scenario.dealerCard);
+                player.addAllCards(playerHand);
 
-                    // play this scenario out
-                    final PlayResult result = simulateStanding(player, dealer, dealerHitsSoft17);
+                // play this scenario out
+                final PlayResult result = simulateStanding(player, dealer, dealerHitsSoft17);
 
-                    if (result.equals(PlayResult.WIN)) {
-                        //System.out.println("I won");
-                        unitsWon += 1;
-                        wins += 1;
-                    }
-
-                    if (result.equals(PlayResult.LOSE)) {
-                        //System.out.println("I lost");
-                        unitsWon -= 1;
-                        losses += 1;
-                    }
-
-                    if (result.equals(PlayResult.PUSH)) {
-                        //System.out.println("I pushed");
-                        pushes += 1;
-                    }
-
-                    //System.out.println("wins: " + wins + ", pushes: " + pushes + ", losses: " + losses);
+                if (result.equals(PlayResult.WIN)) {
+                    //System.out.println("I won");
+                    unitsWon += 1;
+                    wins += 1;
                 }
 
-                return unitsWon;
+                if (result.equals(PlayResult.LOSE)) {
+                    //System.out.println("I lost");
+                    unitsWon -= 1;
+                    losses += 1;
+                }
+
+                if (result.equals(PlayResult.PUSH)) {
+                    //System.out.println("I pushed");
+                    pushes += 1;
+                }
+
+                //System.out.println("wins: " + wins + ", pushes: " + pushes + ", losses: " + losses);
             }
+
+            return unitsWon;
         };
 
         final List<Callable<Double>> taskList = new ArrayList<>();
