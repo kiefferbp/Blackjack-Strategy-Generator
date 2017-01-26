@@ -50,13 +50,13 @@ public class Decider {
         for (int i = 0; i < threadCount; i++) {
             taskList.add(task);
         }
-        
+
         List<Card> result = executorHands.invokeAny(taskList);
         return result;
     }
 
     private Scenario buildScenario(Player player, Player dealer) {
-        Scenario scenario = new Scenario();
+        final Scenario scenario = new Scenario();
         scenario.playerValue = player.getHandValue();
         scenario.dealerCard = Card.getCardWithValue(dealer.getHandValue());
         scenario.isPlayerSoft = player.handIsSoft();
@@ -151,7 +151,7 @@ public class Decider {
             if (player.getHandValue() > 21) {
                 unitsWon -= 1;
             } else { // inductive step: get the expected value of the best strategy with the new hand
-                Scenario newScenario = buildScenario(player, dealer);
+                final Scenario newScenario = buildScenario(player, dealer);
                 unitsWon += computeBestScenarioResult(newScenario, dealerHitsSoft17).getValue();
             }
         }
