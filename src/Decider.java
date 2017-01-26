@@ -1,7 +1,4 @@
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -76,7 +73,7 @@ public class Decider {
         shoe.removeCard(dealerCard);
 
         // generate a random player hand
-        final List<Card> playerCards = generateHandWithValue(scenario.playerValue, scenario.isPlayerSoft);
+        List<Card> playerCards = generateHandWithValue(scenario.playerValue, scenario.isPlayerSoft);
         final int numOfPlayerCards = playerCards.size();
 
         // remove each player card if the shoe has the card
@@ -139,7 +136,7 @@ public class Decider {
             case STAND:
                 return simulateStanding(player, dealer, dealerHitsSoft17);
             default:
-                return null; // other decisions will come soon
+                return null; // other decisions will come later
         }
 
     }
@@ -192,11 +189,6 @@ public class Decider {
 
         final Callable<Double> task = () -> {
             double unitsWon = 0;
-            // debug
-            int wins = 0;
-            int pushes = 0;
-            int losses = 0;
-
             for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
                 // generate a random shoe and player hand under this scenario
                 final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
@@ -231,15 +223,66 @@ public class Decider {
         return expectedWinnings;
     }
 
-    public DecisionValuePair computeBestScenarioResult(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
-        final double expectedHitValue = getExpectedHitValue(scenario, dealerHitsSoft17);
-        final double expectedStandValue = getExpectedStandValue(scenario, dealerHitsSoft17);
-
-        if (expectedHitValue > expectedStandValue) {
-            return new DecisionValuePair(Decision.HIT, expectedHitValue);
+    double getExpectedSplitValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+        if (!scenario.isPair) { // can't split
+            return Long.MIN_VALUE;
         }
 
-        return new DecisionValuePair(Decision.STAND, expectedStandValue);
+        double unitsWon = 0;
+        for (int i = 0; i < SIMULATION_COUNT; i++) {
+            // generate a random shoe and player hand under this scenario
+            final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
+            final Shoe shoe = (Shoe) shoePlayerHandPair[0];
+            final Player playerHand1 = new Player(shoe);
+            final Player playerHand2 = new Player(shoe);
+            final Player dealer = new Player(shoe);
+            final Card playerCard = Card.getCardWithValue(scenario.playerValue / 2);
+            dealer.addCard(scenario.dealerCard);
+            playerHand1.addCard(playerCard);
+            playerHand2.addCard(playerCard);
+
+            // each player hand is required to take a second card
+            playerHand1.hit();
+            playerHand2.hit();
+
+            PlayResult resultHand1;
+            PlayResult resultHand2;
+            if (playerCard.equals(Card.ACE)) {
+                // if we split aces, we cannot take more cards
+                resultHand1 = simulateStanding(playerHand1, dealer, dealerHitsSoft17);
+                shoe.reset(); // to simulate the other hand independently (this is basic strategy after all)
+                resultHand2 = simulateStanding(playerHand2, dealer, dealerHitsSoft17);
+            } else {
+                resultHand1 = simulateBestPlay(playerHand1, dealer, dealerHitsSoft17);
+                shoe.reset();
+                resultHand2 = simulateBestPlay(playerHand2, dealer, dealerHitsSoft17);
+            }
+
+            unitsWon += resultHand1.getWinAmount() + resultHand2.getWinAmount();
+        }
+
+        return unitsWon;
+    }
+
+    public DecisionValuePair computeBestScenarioResult(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+        final Map<Decision, Double> expectedValueMap = new HashMap<>();
+        expectedValueMap.put(Decision.HIT, getExpectedHitValue(scenario, dealerHitsSoft17));
+        expectedValueMap.put(Decision.STAND, getExpectedStandValue(scenario, dealerHitsSoft17));
+        expectedValueMap.put(Decision.SPLIT, getExpectedSplitValue(scenario, dealerHitsSoft17));
+
+        final double bestExpectedValue = Collections.max(expectedValueMap.values());
+        Decision bestExpectedDecision = null;
+        for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
+            final Decision entryDecision = entry.getKey();
+            final double entryExpectedValue = entry.getValue();
+
+            if (entryExpectedValue == bestExpectedValue) {
+                bestExpectedDecision = entryDecision;
+                break;
+            }
+        }
+
+        return new DecisionValuePair(bestExpectedDecision, bestExpectedValue);
     }
 
     public static void main(String[] args) throws Exception {
