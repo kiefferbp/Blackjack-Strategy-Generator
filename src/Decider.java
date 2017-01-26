@@ -34,6 +34,10 @@ public class Decider {
         Callable<List<Card>> task = () -> {
             Player player = new Player();
 
+            if (isSoft) {
+                player.addCard(Card.ACE);
+            }
+            
             while (player.getHandValue() != value || player.handIsSoft() != isSoft) {
                 final Card randomCard = Card.getRandom();
                 player.addCard(randomCard);
