@@ -37,7 +37,7 @@ public class Decider {
             if (isSoft) {
                 player.addCard(Card.ACE);
             }
-            
+
             while (player.getHandValue() != value || player.handIsSoft() != isSoft) {
                 final Card randomCard = Card.getRandom();
                 player.addCard(randomCard);
@@ -125,6 +125,27 @@ public class Decider {
         }
     }
 
+    private PlayResult simulateBestPlay(Player player, Player dealer, boolean dealerHitsSoft17) throws Exception {
+        final Scenario scenario = buildScenario(player, dealer);
+        final Decision bestDecision = computeBestScenarioResult(scenario, dealerHitsSoft17).getDecision();
+
+        switch (bestDecision) {
+            case HIT:
+                player.hit();
+
+                if (player.getHandValue() > 21) {
+                    return PlayResult.LOSE;
+                } else {
+                    return simulateBestPlay(player, dealer, dealerHitsSoft17);
+                }
+            case STAND:
+                return simulateStanding(player, dealer, dealerHitsSoft17);
+            default:
+                return null; // other decisions will come soon
+        }
+
+    }
+
     Map<Scenario, Double> expectedHitMap = new HashMap<>(); // for memoization
     private double getExpectedHitValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
         if (expectedHitMap.get(scenario) != null) {
@@ -151,12 +172,21 @@ public class Decider {
             // take a hit
             player.hit();
 
-            // did we bust?
             if (player.getHandValue() > 21) {
                 unitsWon -= 1;
-            } else { // inductive step: get the expected value of the best strategy with the new hand
-                final Scenario newScenario = buildScenario(player, dealer);
-                unitsWon += computeBestScenarioResult(newScenario, dealerHitsSoft17).getValue();
+            } else {
+                // inductive step: simulate best play on the new hand
+                final PlayResult bestPlayResult = simulateBestPlay(player, dealer, dealerHitsSoft17);
+                switch (bestPlayResult) {
+                    case WIN:
+                        unitsWon += 1;
+                        break;
+                    case LOSE:
+                        unitsWon -= 1;
+                        break;
+                    default: // push --- we'll probably add surrender later
+                        unitsWon += 0;
+                }
             }
         }
 
