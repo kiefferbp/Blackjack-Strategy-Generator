@@ -12,12 +12,10 @@ import java.util.concurrent.Future;
  */
 public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
-    private static final int threadCount = Runtime.getRuntime().availableProcessors();
 
+    private static final int threadCount = Runtime.getRuntime().availableProcessors();
     private static final ExecutorService executorHands = Executors.newFixedThreadPool(threadCount);
     private static final ExecutorService executorStand = Executors.newFixedThreadPool(threadCount);
-
-    private final Map<Scenario, HashMap<Decision, Double>> expectedValues = new HashMap<>();
 
     private int deckCount = 4;
     private double penetrationValue = 1.0;
@@ -97,7 +95,7 @@ public class Decider {
             return getShoePlayerHandPair(deckCount, penetrationValue, scenario);
         }
 
-        // if the dealer has an Ace or a 10-valued card, the card at the top of the shoe cannot give him Blackjack
+        // if the dealer has an Ace or a 10-valued card, the card at the top of the shoe cannot give him a blackjack
         if ((scenario.dealerCard.equals(Card.ACE) && shoe.peekTopCard().getValue() == 10) ||
                 (scenario.dealerCard.getValue() == 10 && shoe.peekTopCard().equals(Card.ACE))) {
             // retry
@@ -177,16 +175,7 @@ public class Decider {
             } else {
                 // inductive step: simulate best play on the new hand
                 final PlayResult bestPlayResult = simulateBestPlay(player, dealer, dealerHitsSoft17);
-                switch (bestPlayResult) {
-                    case WIN:
-                        unitsWon += 1;
-                        break;
-                    case LOSE:
-                        unitsWon -= 1;
-                        break;
-                    default: // push --- we'll probably add surrender later
-                        unitsWon += 0;
-                }
+                unitsWon += bestPlayResult.getWinAmount();
             }
         }
 
@@ -220,25 +209,7 @@ public class Decider {
 
                 // play this scenario out
                 final PlayResult result = simulateStanding(player, dealer, dealerHitsSoft17);
-
-                if (result.equals(PlayResult.WIN)) {
-                    //System.out.println("I won");
-                    unitsWon += 1;
-                    wins += 1;
-                }
-
-                if (result.equals(PlayResult.LOSE)) {
-                    //System.out.println("I lost");
-                    unitsWon -= 1;
-                    losses += 1;
-                }
-
-                if (result.equals(PlayResult.PUSH)) {
-                    //System.out.println("I pushed");
-                    pushes += 1;
-                }
-
-                //System.out.println("wins: " + wins + ", pushes: " + pushes + ", losses: " + losses);
+                unitsWon += result.getWinAmount();
             }
 
             return unitsWon;
@@ -269,10 +240,6 @@ public class Decider {
         }
 
         return new DecisionValuePair(Decision.STAND, expectedStandValue);
-    }
-
-    private Map<Scenario, Map<Decision, Double>> computeExpectedValues() {
-        return null;
     }
 
     public static void main(String[] args) throws Exception {
