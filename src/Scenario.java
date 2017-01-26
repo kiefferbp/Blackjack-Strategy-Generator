@@ -40,7 +40,7 @@ public class Scenario {
         String playerDescription;
         if (isPair) {
             final Card playerCard = Card.getCardWithValue(playerValue / 2);
-            playerDescription = "Player pair of " + playerCard;
+            playerDescription = "Player pair of " + playerCard + "s";
         } else {
             playerDescription = "Player " + playerHandType + " " + playerValue;
         }

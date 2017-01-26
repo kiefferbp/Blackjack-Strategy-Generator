@@ -245,20 +245,18 @@ public class Decider {
             playerHand1.hit();
             playerHand2.hit();
 
-            PlayResult resultHand1;
-            PlayResult resultHand2;
+            final Scenario scenarioHand1 = buildScenario(playerHand1, dealer);
+            final Scenario scenarioHand2 = buildScenario(playerHand2, dealer);
             if (playerCard.equals(Card.ACE)) {
                 // if we split aces, we cannot take more cards
-                resultHand1 = simulateStanding(playerHand1, dealer, dealerHitsSoft17);
-                shoe.reset(); // to simulate the other hand independently (this is basic strategy after all)
-                resultHand2 = simulateStanding(playerHand2, dealer, dealerHitsSoft17);
+                final double expectedStandHand1 = getExpectedStandValue(scenarioHand1, dealerHitsSoft17);
+                final double expectedStandHand2 = getExpectedStandValue(scenarioHand2, dealerHitsSoft17);
+                unitsWon += expectedStandHand1 + expectedStandHand2;
             } else {
-                resultHand1 = simulateBestPlay(playerHand1, dealer, dealerHitsSoft17);
-                shoe.reset();
-                resultHand2 = simulateBestPlay(playerHand2, dealer, dealerHitsSoft17);
+                final double expectedBestHand1 = computeBestScenarioResult(scenarioHand1, dealerHitsSoft17).getValue();
+                final double expectedBestHand2 = computeBestScenarioResult(scenarioHand2, dealerHitsSoft17).getValue();
+                unitsWon += expectedBestHand1 + expectedBestHand2;
             }
-
-            unitsWon += resultHand1.getWinAmount() + resultHand2.getWinAmount();
         }
 
         return unitsWon;
