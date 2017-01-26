@@ -13,7 +13,10 @@ import java.util.concurrent.Future;
 public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
-    private static final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
+    private static final ExecutorService executorHands = Executors.newFixedThreadPool(threadCount);
+    private static final ExecutorService executorHit = Executors.newFixedThreadPool(threadCount);
+    private static final ExecutorService executorStand = Executors.newFixedThreadPool(threadCount);
 
     private final Map<Scenario, HashMap<Decision, Double>> expectedValues = new HashMap<>();
 
@@ -21,7 +24,9 @@ public class Decider {
     private double penetrationValue = 1.0;
 
     public static void shutDownThreads() {
-        executor.shutdownNow();
+        executorHands.shutdownNow();
+        executorHit.shutdownNow();
+        executorStand.shutdownNow();
     }
 
     // returns a random hand with the given value with the given softness
@@ -51,7 +56,9 @@ public class Decider {
             taskList.add(task);
         }
 
-        List<Card> result = executor.invokeAny(taskList);
+        //System.out.println("before pair");
+        List<Card> result = executorHands.invokeAny(taskList);
+        //System.out.println("after pair");
         return result;
     }
 
@@ -162,51 +169,68 @@ public class Decider {
     }
 
     Map<Scenario, Double> expectedStandMap = new HashMap<>(); // for memoization
-    private double getExpectedStandValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+    private double getExpectedStandValue(final Scenario scenario, final boolean dealerHitsSoft17) throws Exception {
         if (expectedStandMap.get(scenario) != null) {
             return expectedStandMap.get(scenario);
         }
 
-        double unitsWon = 0;
-        // debug
-        int wins = 0;
-        int pushes = 0;
-        int losses = 0;
-        for (int i = 0; i < SIMULATION_COUNT; i++) {
-            // generate a random shoe and player hand under this scenario
-            final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
-            final Shoe shoe = (Shoe) shoePlayerHandPair[0];
-            final Player player = new Player(shoe);
-            final Player dealer = new Player(shoe);
-            final List<Card> playerHand = (List<Card>) shoePlayerHandPair[1];
-            dealer.addCard(scenario.dealerCard);
-            player.addAllCards(playerHand);
+        final Callable<Double> task = new Callable<Double>() {
+            @Override
+            public Double call() throws Exception {
+                double unitsWon = 0;
+                // debug
+                int wins = 0;
+                int pushes = 0;
+                int losses = 0;
 
-            // play this scenario out
-            final PlayResult result = simulateStanding(player, dealer, dealerHitsSoft17);
+                for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
+                    // generate a random shoe and player hand under this scenario
+                    final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
+                    final Shoe shoe = (Shoe) shoePlayerHandPair[0];
+                    final Player player = new Player(shoe);
+                    final Player dealer = new Player(shoe);
+                    final List<Card> playerHand = (List<Card>) shoePlayerHandPair[1];
+                    dealer.addCard(scenario.dealerCard);
+                    player.addAllCards(playerHand);
 
-            if (result.equals(PlayResult.WIN)) {
-                //System.out.println("I won");
-                unitsWon += 1;
-                wins += 1;
+                    // play this scenario out
+                    final PlayResult result = simulateStanding(player, dealer, dealerHitsSoft17);
+
+                    if (result.equals(PlayResult.WIN)) {
+                        //System.out.println("I won");
+                        unitsWon += 1;
+                        wins += 1;
+                    }
+
+                    if (result.equals(PlayResult.LOSE)) {
+                        //System.out.println("I lost");
+                        unitsWon -= 1;
+                        losses += 1;
+                    }
+
+                    if (result.equals(PlayResult.PUSH)) {
+                        //System.out.println("I pushed");
+                        pushes += 1;
+                    }
+
+                    //System.out.println("wins: " + wins + ", pushes: " + pushes + ", losses: " + losses);
+                }
+
+                return unitsWon;
             }
+        };
 
-            if (result.equals(PlayResult.LOSE)) {
-                //System.out.println("I lost");
-                unitsWon -= 1;
-                losses += 1;
-            }
-
-            if (result.equals(PlayResult.PUSH)) {
-                //System.out.println("I pushed");
-                pushes += 1;
-            }
-
-            System.out.println("wins: " + wins + ", pushes: " + pushes + ", losses: " + losses);
+        final List<Callable<Double>> taskList = new ArrayList<>();
+        for (int i = 0; i < threadCount; i++) {
+            taskList.add(task);
         }
 
-        final double expectedWinnings = unitsWon / SIMULATION_COUNT;
+        double totalUnitsWon = 0;
+        for (Future<Double> future : executorStand.invokeAll(taskList)) {
+            totalUnitsWon += future.get();
+        }
 
+        final double expectedWinnings = totalUnitsWon / (threadCount * Math.ceil(SIMULATION_COUNT / threadCount));
         System.out.println("standing result (" + scenario + "): " + expectedWinnings);
         expectedStandMap.put(scenario, expectedWinnings);
         return expectedWinnings;
@@ -230,11 +254,13 @@ public class Decider {
     public static void main(String[] args) throws Exception {
         Decider d = new Decider();
         Scenario scenario = new Scenario();
-        scenario.playerValue = 21;
-        scenario.isPlayerSoft = false;
+        scenario.playerValue = 18;
+        scenario.isPlayerSoft = true;
         scenario.isPair = false;
-        scenario.dealerCard = Card.TWO;
+        scenario.dealerCard = Card.ACE;
 
+        System.out.println("solving " + scenario);
+        final long startTime = System.nanoTime();
         DecisionValuePair p = d.computeBestScenarioResult(scenario, false);
         if (p.getDecision().equals(Decision.HIT)) {
             System.out.println(scenario + " best strategy: HIT (" + p.getValue() + ")");
@@ -243,5 +269,7 @@ public class Decider {
         }
 
         Decider.shutDownThreads();
+        final long endTime = System.nanoTime();
+        System.out.println("Computation time: " + (endTime - startTime)/1000000000.0 + "s");
     }
 }
