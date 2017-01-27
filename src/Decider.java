@@ -64,6 +64,11 @@ public class Decider {
         return scenario;
     }
 
+    private boolean isBlackjackPair(Card card1, Card card2) {
+        return ((card1.equals(Card.ACE) && card2.getValue() == 10) ||
+                (card1.getValue() == 10 && card2.equals(Card.ACE)));
+    }
+
     // returns an Object array with two elements: the modified shoe, and the player hand
     private Object[] getShoePlayerHandPair(int deckCount, double penetrationValue, Scenario scenario) throws Exception {
         final Shoe shoe = new Shoe(deckCount, penetrationValue);
@@ -92,17 +97,18 @@ public class Decider {
             return getShoePlayerHandPair(deckCount, penetrationValue, scenario);
         }
 
-        // if the dealer has an Ace or a 10-valued card, the card at the top of the shoe cannot give him a blackjack
-        if ((scenario.dealerCard.equals(Card.ACE) && shoe.peekTopCard().getValue() == 10) ||
-                (scenario.dealerCard.getValue() == 10 && shoe.peekTopCard().equals(Card.ACE))) {
-            // retry
-            return getShoePlayerHandPair(deckCount, penetrationValue, scenario);
-        }
         return new Object[]{shoe, playerCards};
     }
 
     // simulates and returns the PlayResult that occurs when standing under a scenario
-    private PlayResult simulateStanding(Player player, Player dealer, boolean dealerHitsSoft17) throws Exception {
+    private PlayResult simulateStanding(Player player, Player dealer, Shoe shoe, boolean dealerHitsSoft17) throws Exception {
+        // if the dealer has an Ace or a 10-valued card, the card at the top of the shoe cannot give him a blackjack
+        // if the top card yields a BJ, shuffle the shoe until it no longer does
+        final Card dealerCard = dealer.getCards().get(0); // the dealer only has one card right now
+        while (isBlackjackPair(dealerCard, shoe.peekTopCard())) {
+            shoe.shuffle();
+        }
+
         // play out the dealer's hand
         while (dealer.getHandValue() < 17 || (dealer.getHandValue() == 17 && dealer.handIsSoft() && dealerHitsSoft17)) {
             dealer.hit();
@@ -120,7 +126,7 @@ public class Decider {
         }
     }
 
-    private PlayResult simulateBestPlay(Player player, Player dealer, boolean dealerHitsSoft17) throws Exception {
+    private PlayResult simulateBestPlay(Player player, Player dealer, Shoe shoe, boolean dealerHitsSoft17) throws Exception {
         final Scenario scenario = buildScenario(player, dealer);
         final Decision bestDecision = computeBestScenarioResult(scenario, dealerHitsSoft17).getDecision();
 
@@ -131,10 +137,10 @@ public class Decider {
                 if (player.getHandValue() > 21) {
                     return PlayResult.LOSE;
                 } else {
-                    return simulateBestPlay(player, dealer, dealerHitsSoft17);
+                    return simulateBestPlay(player, dealer, shoe, dealerHitsSoft17);
                 }
             case STAND:
-                return simulateStanding(player, dealer, dealerHitsSoft17);
+                return simulateStanding(player, dealer, shoe, dealerHitsSoft17);
             default:
                 return null; // other decisions will come later
         }
@@ -171,12 +177,13 @@ public class Decider {
                 unitsWon -= 1;
             } else {
                 // inductive step: simulate best play on the new hand
-                final PlayResult bestPlayResult = simulateBestPlay(player, dealer, dealerHitsSoft17);
+                final PlayResult bestPlayResult = simulateBestPlay(player, dealer, shoe, dealerHitsSoft17);
                 unitsWon += bestPlayResult.getWinAmount();
             }
         }
 
         final double expectedWinnings = unitsWon / SIMULATION_COUNT;
+        System.out.println("hitting result (" + scenario + "): " + expectedWinnings);
         expectedHitMap.put(scenario, expectedWinnings);
         return expectedWinnings;
     }
@@ -200,7 +207,7 @@ public class Decider {
                 player.addAllCards(playerHand);
 
                 // play this scenario out
-                final PlayResult result = simulateStanding(player, dealer, dealerHitsSoft17);
+                final PlayResult result = simulateStanding(player, dealer, shoe, dealerHitsSoft17);
                 unitsWon += result.getWinAmount();
             }
 
@@ -230,14 +237,17 @@ public class Decider {
 
         double unitsWon = 0;
         for (int i = 0; i < SIMULATION_COUNT; i++) {
-            // generate a random shoe and player hand under this scenario
-            final Object[] shoePlayerHandPair = getShoePlayerHandPair(deckCount, penetrationValue, scenario);
-            final Shoe shoe = (Shoe) shoePlayerHandPair[0];
+            final Shoe shoe = new Shoe(deckCount, penetrationValue);
+            final Card playerCard = Card.getCardWithValue(scenario.playerValue / 2);
+            final Card dealerCard = scenario.dealerCard;
+            shoe.removeCard(playerCard);
+            shoe.removeCard(playerCard);
+            shoe.removeCard(dealerCard);
+
             final Player playerHand1 = new Player(shoe);
             final Player playerHand2 = new Player(shoe);
             final Player dealer = new Player(shoe);
-            final Card playerCard = Card.getCardWithValue(scenario.playerValue / 2);
-            dealer.addCard(scenario.dealerCard);
+            dealer.addCard(dealerCard);
             playerHand1.addCard(playerCard);
             playerHand2.addCard(playerCard);
 
@@ -286,10 +296,10 @@ public class Decider {
     public static void main(String[] args) throws Exception {
         Decider d = new Decider();
         Scenario scenario = new Scenario();
-        scenario.playerValue = 18;
-        scenario.isPlayerSoft = true;
+        scenario.playerValue = 16;
+        scenario.isPlayerSoft = false;
         scenario.isPair = false;
-        scenario.dealerCard = Card.ACE;
+        scenario.dealerCard = Card.TEN;
 
         System.out.println("solving " + scenario);
         final long startTime = System.nanoTime();

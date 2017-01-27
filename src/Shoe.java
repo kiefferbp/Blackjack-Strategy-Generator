@@ -14,7 +14,7 @@ public class Shoe {
             shoe.addAll(deck);
         }
 
-        Collections.shuffle(shoe);
+        shuffle();
 
         // remove cards up to the cut card, which removes [100(1 - |penetrationValue|)]% of the deck
         final int numCardsToRemove = (int) Math.floor((1 - penetrationValue) * deckCount * Deck.CARDS_PER_DECK);
@@ -26,9 +26,8 @@ public class Shoe {
         originalShoe.addAll(shoe);
     }
 
-    public Shoe reset() {
-        shoe = originalShoe;
-
+    public Shoe shuffle() {
+        Collections.shuffle(shoe);
         return this;
     }
 
@@ -41,6 +40,9 @@ public class Shoe {
     }
 
     public boolean removeCard(Card card) {
-        return shoe.remove(card);
+        final boolean cardWasRemoved = shoe.remove(card);
+        shuffle();
+
+        return cardWasRemoved;
     }
 }
