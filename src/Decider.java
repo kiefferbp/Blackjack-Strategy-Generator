@@ -26,7 +26,7 @@ public class Decider {
     // NOTE: the caller must verify that this hand is valid for a given shoe.
     // (e.g., generateHand(21, false) may give [3, 3, 3, 3, 3, 6] which has too many 3's for one deck)
     private List<Card> generateHandWithValue(final int value, final boolean isSoft) throws Exception {
-        Callable<List<Card>> task = () -> {
+        final Callable<List<Card>> task = () -> {
             Player player = new Player();
 
             if (isSoft) {
@@ -45,12 +45,12 @@ public class Decider {
             return player.getCards();
         };
 
-        List<Callable<List<Card>>> taskList = new ArrayList<>();
+        final List<Callable<List<Card>>> taskList = new ArrayList<>();
         for (int i = 0; i < threadCount; i++) {
             taskList.add(task);
         }
 
-        List<Card> result = executorHands.invokeAny(taskList);
+        final List<Card> result = executorHands.invokeAny(taskList);
         return result;
     }
 
