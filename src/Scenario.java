@@ -34,7 +34,21 @@ public class Scenario {
 
     @Override
     public String toString() {
-        final String playerHandType = (isPlayerSoft ? "Soft" : "Hard");
-        return "Player " + playerHandType + " " + playerValue + " against a Dealer " + dealerCard;
+        final StringBuilder result = new StringBuilder();
+
+        String playerDescription;
+        if (isPair) {
+            final Card playerCard = Card.getCardWithValue(playerValue / 2);
+            playerDescription = "Player pair of " + playerCard + "s";
+        } else {
+            final String playerHandType = (isPlayerSoft ? "Soft" : "Hard");
+            playerDescription = "Player " + playerHandType + " " + playerValue;
+        }
+        result.append(playerDescription);
+
+        // append the dealer hand description
+        result.append(" against a dealer " + dealerCard);
+
+        return result.toString();
     }
 }
