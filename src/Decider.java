@@ -11,15 +11,13 @@ public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
 
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
-    private static final ExecutorService executorHands = Executors.newFixedThreadPool(threadCount);
-    private static final ExecutorService executorStand = Executors.newFixedThreadPool(threadCount);
+    private static final ExecutorService executor = Executors.newCachedThreadPool();
 
     private int deckCount = 4;
     private double penetrationValue = 1.0;
 
     public static void shutDownThreads() {
-        executorHands.shutdownNow();
-        executorStand.shutdownNow();
+        executor.shutdownNow();
     }
 
     // returns a random hand with the given value with the given softness
@@ -50,7 +48,7 @@ public class Decider {
             taskList.add(task);
         }
 
-        final List<Card> result = executorHands.invokeAny(taskList);
+        final List<Card> result = executor.invokeAny(taskList);
         return result;
     }
 
@@ -220,7 +218,7 @@ public class Decider {
         }
 
         double totalUnitsWon = 0;
-        for (Future<Double> future : executorStand.invokeAll(taskList)) {
+        for (Future<Double> future : executor.invokeAll(taskList)) {
             totalUnitsWon += future.get();
         }
 

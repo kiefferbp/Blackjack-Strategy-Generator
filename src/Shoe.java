@@ -1,4 +1,5 @@
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Created by Brian on 1/17/2017.
@@ -27,7 +28,7 @@ public class Shoe {
     }
 
     public Shoe shuffle() {
-        Collections.shuffle(shoe);
+        Collections.shuffle(shoe, ThreadLocalRandom.current());
         return this;
     }
 

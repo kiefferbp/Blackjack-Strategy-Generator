@@ -1,3 +1,5 @@
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * Created by Brian on 1/17/2017.
  */
@@ -39,11 +41,7 @@ public enum Card {
     }
 
     public static Card getRandom() {
-        return values()[(int) (Math.random() * values().length)];
-    }
-
-    public static Card getRandomWithoutAce() {
-        return values()[(int) (Math.random() * (values().length - 1))];
+        return values()[ThreadLocalRandom.current().nextInt(0, values().length)];
     }
 
     @Override
