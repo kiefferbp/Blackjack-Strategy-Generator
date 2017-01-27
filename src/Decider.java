@@ -232,7 +232,7 @@ public class Decider {
 
     double getExpectedSplitValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
         if (!scenario.isPair) { // can't split
-            return Long.MIN_VALUE;
+            return Integer.MIN_VALUE;
         }
 
         double unitsWon = 0;
@@ -269,24 +269,30 @@ public class Decider {
             }
         }
 
-        return unitsWon;
+        return unitsWon / SIMULATION_COUNT;
     }
 
-    public DecisionValuePair computeBestScenarioResult(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+    public Map<Decision, Double> computeExpectedValues(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
         final Map<Decision, Double> expectedValueMap = new HashMap<>();
         expectedValueMap.put(Decision.HIT, getExpectedHitValue(scenario, dealerHitsSoft17));
         expectedValueMap.put(Decision.STAND, getExpectedStandValue(scenario, dealerHitsSoft17));
         expectedValueMap.put(Decision.SPLIT, getExpectedSplitValue(scenario, dealerHitsSoft17));
 
-        final double bestExpectedValue = Collections.max(expectedValueMap.values());
+        return expectedValueMap;
+    }
+
+    public DecisionValuePair computeBestScenarioResult(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+        final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario, dealerHitsSoft17);
+
         Decision bestExpectedDecision = null;
+        double bestExpectedValue = Integer.MIN_VALUE;
         for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
             final Decision entryDecision = entry.getKey();
             final double entryExpectedValue = entry.getValue();
 
-            if (entryExpectedValue == bestExpectedValue) {
+            if (entryExpectedValue > bestExpectedValue) {
                 bestExpectedDecision = entryDecision;
-                break;
+                bestExpectedValue = entryExpectedValue;
             }
         }
 
@@ -294,21 +300,25 @@ public class Decider {
     }
 
     public static void main(String[] args) throws Exception {
-        Decider d = new Decider();
-        Scenario scenario = new Scenario();
+        final Decider d = new Decider();
+        final Scenario scenario = new Scenario();
         scenario.playerValue = 16;
         scenario.isPlayerSoft = false;
-        scenario.isPair = false;
-        scenario.dealerCard = Card.TEN;
+        scenario.isPair = true;
+        scenario.dealerCard = Card.ACE;
 
         System.out.println("solving " + scenario);
         final long startTime = System.nanoTime();
-        DecisionValuePair p = d.computeBestScenarioResult(scenario, false);
-        if (p.getDecision().equals(Decision.HIT)) {
-            System.out.println(scenario + " best strategy: HIT (" + p.getValue() + ")");
-        } else {
-            System.out.println(scenario + " best strategy: STAND (" + p.getValue() + ")");
-        }
+        final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, false);
+        final DecisionValuePair p = d.computeBestScenarioResult(scenario, false);
+        System.out.println(scenario + " best strategy: " + p.getDecision() + " (" + p.getValue() + ")");
+
+        /*for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
+            final Decision entryDecision = entry.getKey();
+            final double entryExpectedValue = entry.getValue();
+
+            System.out.println("Expected value of " + entryDecision + ": " + entryExpectedValue);
+        }*/
 
         Decider.shutDownThreads();
         final long endTime = System.nanoTime();
