@@ -145,7 +145,7 @@ public class Decider {
 
     }
 
-    Map<Scenario, Double> expectedHitMap = new HashMap<>(); // for memoization
+    final Map<Scenario, Double> expectedHitMap = new HashMap<>(); // for memoization
     private double getExpectedHitValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
         if (expectedHitMap.get(scenario) != null) {
             return expectedHitMap.get(scenario);
@@ -186,7 +186,7 @@ public class Decider {
         return expectedWinnings;
     }
 
-    Map<Scenario, Double> expectedStandMap = new HashMap<>(); // for memoization
+    final Map<Scenario, Double> expectedStandMap = new HashMap<>(); // for memoization
     private double getExpectedStandValue(final Scenario scenario, final boolean dealerHitsSoft17) throws Exception {
         if (expectedStandMap.get(scenario) != null) {
             return expectedStandMap.get(scenario);
