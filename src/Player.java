@@ -70,6 +70,11 @@ public class Player {
         return cardObtained;
     }
 
+    public void resetHand() {
+        cards.clear();
+        aceCount = 0;
+    }
+
     public int getHandValue() {
         // begin considering the value of the cards that are not aces
         int handValue = getHandValueWithoutAces();

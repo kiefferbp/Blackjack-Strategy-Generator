@@ -11,7 +11,7 @@ public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
 
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
-    private static final ExecutorService executor = Executors.newCachedThreadPool();
+    private static final ExecutorService executor = Executors.newFixedThreadPool(10);
 
     private int deckCount = 4;
     private double penetrationValue = 1.0;
@@ -36,7 +36,7 @@ public class Decider {
                 player.addCard(randomCard);
 
                 if (player.getHandValue() > 21) {
-                    player = new Player(); // very, very dirty
+                    player.resetHand(); // very, very dirty
                 }
             }
 
@@ -307,7 +307,7 @@ public class Decider {
 
         System.out.println("solving " + scenario);
         final long startTime = System.nanoTime();
-        final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, false);
+        //final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, false);
         final DecisionValuePair p = d.computeBestScenarioResult(scenario, false);
         System.out.println(scenario + " best strategy: " + p.getDecision() + " (" + p.getValue() + ")");
 
