@@ -1,7 +1,10 @@
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * Created by Brian on 1/17/2017.
  */
 public enum Card {
+    ACE (11, "Ace"), // assuming soft hand
     TWO (2, "Two"),
     THREE (3, "Three"),
     FOUR (4, "Four"),
@@ -13,8 +16,7 @@ public enum Card {
     TEN (10, "Ten"),
     KING (10, "King"),
     QUEEN (10, "Queen"),
-    JACK (10, "Jack"),
-    ACE (11, "Ace"); // assuming soft hand
+    JACK (10, "Jack");
 
     private int value;
     private String name;
@@ -39,11 +41,20 @@ public enum Card {
     }
 
     public static Card getRandom() {
-        return values()[(int) (Math.random() * values().length)];
+        return values()[ThreadLocalRandom.current().nextInt(0, values().length)];
     }
 
-    public static Card getRandomWithoutAce() {
-        return values()[(int) (Math.random() * (values().length - 1))];
+    public static Card getRandomWithMaxRange(int maxValue) {
+        final Card[] cards = Card.values();
+
+        int maxIndex;
+        if (maxValue < 10) { // Card.TWO through Card.NINE
+            maxIndex = maxValue - 1; // cards[1] = Card.TWO, ..., cards[8] = Card.NINE
+        } else {
+            maxIndex = 12; // include 10/J/Q/K
+        }
+
+        return values()[ThreadLocalRandom.current().nextInt(0, maxIndex + 1)];
     }
 
     @Override
