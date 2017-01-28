@@ -26,62 +26,22 @@ public class Decider {
     private List<Card> generateHandWithValue(final int targetValue, final boolean targetIsSoft) throws Exception {
         final Callable<List<Card>> task = () -> {
             final Player player = new Player();
-            final Callable<Optional<Void>> resetHandTask = () -> {
-                player.resetHand();
-
-                if (targetIsSoft) {
-                    player.addCard(Card.ACE);
-                }
-
-                return Optional.empty();
-            };
 
             if (targetIsSoft) {
                 player.addCard(Card.ACE);
             }
 
             while (player.getHandValue() != targetValue || player.handIsSoft() != targetIsSoft) {
-                final int currentHandValue = player.getHandValue();
-                final boolean isCurrentlySoft = player.handIsSoft();
-
-                // Explanation: we can build a hand of value |currentHandValue| to one of value |targetValue|
-                // by noting that we can usually pick a random card whose value is at most |targetValue| - |currentHandValue|.
-                // There are some exceptions to this, however.
-                // (i) If |targetValue| < 11 and |targetValue| - |currentHandValue| = 1, building isn't possible
-                // (e.g., a hard 9 cannot become a hard 10, as adding an ace to a hard 9 makes a soft 20)
-                // (ii) If |isCurrentlySoft| is true and |targetIsSoft| is false, we can take any card that
-                // results in either another soft hand or one that tips the new value <= |targetValue|. (see the if statement)
-                Card randomCard = null;
-                if (targetValue < 11 && targetValue == currentHandValue + 1) { // scenario (i): impossible to build
-                    // start over
-                    resetHandTask.call();
-                    continue;
-                } else if (targetValue == currentHandValue + 1) {
-                    randomCard = Card.ACE;
-                } else if (isCurrentlySoft && !targetIsSoft) { // scenario (ii)
-                    if (currentHandValue > targetValue) {
-                        // Suppose that you want to generate a hard T from a soft X hand, X > T and T > 11. If you draw a
-                        // card with value V such that X + V > 21 (i.e., the hand becomes hard), the resulting
-                        // hand is a hard X + V - 10. Thus, X + V - 10 <= T and so V <= T - X + 10.
-                        // For example, to generate a hard 13 from a soft 19 we can only randomly pick a card V among those
-                        // whose values are <= 13 - 19 + 10 = 4 (Ace, 2, 3, and 4).
-                        final int maxRandomCardValue = targetValue - currentHandValue + 10;
-
-                        if (maxRandomCardValue < 1) { // impossible
-                            resetHandTask.call();
-                            continue;
-                        }
-
-                        randomCard = Card.getRandomWithMaxRange(maxRandomCardValue);
-                    } else {
-                        randomCard = Card.getRandom();
-                    }
-                } else {
-                    final int maxRandomCardValue = targetValue - currentHandValue;
-                    randomCard = Card.getRandomWithMaxRange(maxRandomCardValue);
-                }
-
+                final Card randomCard = Card.getRandom();
                 player.addCard(randomCard);
+
+                if (player.getHandValue() > 21) {
+                    player.resetHand();
+
+                    if (targetIsSoft) {
+                        player.addCard(Card.ACE);
+                    }
+                }
             }
 
             return player.getCards();
