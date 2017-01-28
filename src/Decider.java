@@ -10,7 +10,7 @@ import java.util.concurrent.Future;
 public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
 
-    private static final int threadCount = Runtime.getRuntime().availableProcessors() - 3;
+    private static final int threadCount = Runtime.getRuntime().availableProcessors();
     private static final ExecutorService executor = Executors.newFixedThreadPool(10);
 
     private int deckCount = 4;
@@ -24,7 +24,6 @@ public class Decider {
     // NOTE: the caller must verify that this hand is valid for a given shoe.
     // (e.g., generateHand(21, false) may give [3, 3, 3, 3, 3, 6] which has too many 3's for one deck)
     private List<Card> generateHandWithValue(final int targetValue, final boolean targetIsSoft) throws Exception {
-        System.out.println("Trying to produce a " + (targetIsSoft ? "Soft" : "Hard") + " " + targetValue + "...");
 
         final Callable<List<Card>> task = () -> {
             final Player player = new Player();
@@ -39,13 +38,10 @@ public class Decider {
             };
 
             if (targetIsSoft) {
-                System.out.println("Hand is soft. Starting out with an ace.");
                 player.addCard(Card.ACE);
             }
 
             while (player.getHandValue() != targetValue || player.handIsSoft() != targetIsSoft) {
-                System.out.println("Current hand: " + player);
-                Thread.sleep(10);
                 final int currentHandValue = player.getHandValue();
                 final boolean isCurrentlySoft = player.handIsSoft();
 
@@ -58,12 +54,10 @@ public class Decider {
                 // results in either another soft hand or one that tips the new value <= |targetValue|. (see the if statement)
                 Card randomCard = null;
                 if (targetValue < 11 && targetValue == currentHandValue + 1) { // scenario (i): impossible to build
-                    System.out.println("Target is impossible to build. player: " + player);
                     // start over
                     resetHandTask.call();
                     continue;
                 } else if (targetValue == currentHandValue + 1) {
-                    System.out.println("Within 1. Adding an ace and finishing.");
                     randomCard = Card.ACE;
                 } else if (isCurrentlySoft && !targetIsSoft) { // scenario (ii)
                     if (currentHandValue > targetValue) {
@@ -79,19 +73,13 @@ public class Decider {
                             continue;
                         }
 
-                        System.out.println("Hand is soft. Adding any card within " + maxRandomCardValue);
                         randomCard = Card.getRandomWithMaxRange(maxRandomCardValue);
-                        System.out.println("Randomly picked a " + randomCard);
                     } else {
-                        System.out.println("Hand is soft. Adding any card.");
                         randomCard = Card.getRandom();
-                        System.out.println("Randomly picked a " + randomCard);
                     }
                 } else {
                     final int maxRandomCardValue = targetValue - currentHandValue;
-                    System.out.println("Hand is hard. Adding any card within " + maxRandomCardValue);
                     randomCard = Card.getRandomWithMaxRange(maxRandomCardValue);
-                    System.out.println("Randomly picked a " + randomCard);
                 }
 
                 player.addCard(randomCard);
