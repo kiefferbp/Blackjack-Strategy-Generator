@@ -189,7 +189,7 @@ public class Decider {
 
     }
 
-    final Map<Scenario, Double> expectedHitMap = new HashMap<>(); // for memoization
+    private final Map<Scenario, Double> expectedHitMap = new HashMap<>(); // for memoization
     private double getExpectedHitValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
         if (expectedHitMap.get(scenario) != null) {
             return expectedHitMap.get(scenario);
@@ -230,7 +230,7 @@ public class Decider {
         return expectedWinnings;
     }
 
-    final Map<Scenario, Double> expectedStandMap = new HashMap<>(); // for memoization
+    private final Map<Scenario, Double> expectedStandMap = new HashMap<>(); // for memoization
     private double getExpectedStandValue(final Scenario scenario, final boolean dealerHitsSoft17) throws Exception {
         if (expectedStandMap.get(scenario) != null) {
             return expectedStandMap.get(scenario);
@@ -272,7 +272,7 @@ public class Decider {
         return expectedWinnings;
     }
 
-    double getExpectedSplitValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+    private double getExpectedSplitValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
         if (!scenario.isPair) { // can't split
             return Integer.MIN_VALUE;
         }
@@ -314,12 +314,18 @@ public class Decider {
         return unitsWon / SIMULATION_COUNT;
     }
 
+    private final Map<Scenario, Map<Decision, Double>> scenarioExpectedValues = new HashMap<>();
     public Map<Decision, Double> computeExpectedValues(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+        if (scenarioExpectedValues.get(scenario) != null) {
+            return scenarioExpectedValues.get(scenario);
+        }
+
         final Map<Decision, Double> expectedValueMap = new HashMap<>();
         expectedValueMap.put(Decision.HIT, getExpectedHitValue(scenario, dealerHitsSoft17));
         expectedValueMap.put(Decision.STAND, getExpectedStandValue(scenario, dealerHitsSoft17));
         expectedValueMap.put(Decision.SPLIT, getExpectedSplitValue(scenario, dealerHitsSoft17));
 
+        scenarioExpectedValues.put(scenario, expectedValueMap);
         return expectedValueMap;
     }
 
@@ -346,21 +352,21 @@ public class Decider {
         final Scenario scenario = new Scenario();
         scenario.playerValue = 16;
         scenario.isPlayerSoft = false;
-        scenario.isPair = true;
+        scenario.isPair = false;
         scenario.dealerCard = Card.ACE;
 
         System.out.println("solving " + scenario);
         final long startTime = System.nanoTime();
-        //final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, false);
+        final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, false);
         final DecisionValuePair p = d.computeBestScenarioResult(scenario, false);
         System.out.println(scenario + " best strategy: " + p.getDecision() + " (" + p.getValue() + ")");
 
-        /*for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
+        for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
             final Decision entryDecision = entry.getKey();
             final double entryExpectedValue = entry.getValue();
 
             System.out.println("Expected value of " + entryDecision + ": " + entryExpectedValue);
-        }*/
+        }
 
         Decider.shutDownThreads();
         final long endTime = System.nanoTime();
