@@ -32,6 +32,12 @@ public class Shoe {
         return this;
     }
 
+    public Shoe restoreShoe() {
+        shoe.clear();
+        shoe.addAll(originalShoe);
+        return this;
+    }
+
     public Card removeTopCard() {
         return shoe.pop();
     }
