@@ -24,7 +24,6 @@ public class Decider {
     // NOTE: the caller must verify that this hand is valid for a given shoe.
     // (e.g., generateHand(21, false) may give [3, 3, 3, 3, 3, 6] which has too many 3's for one deck)
     private List<Card> generateHandWithValue(final int targetValue, final boolean targetIsSoft) throws Exception {
-
         final Callable<List<Card>> task = () -> {
             final Player player = new Player();
             final Callable<Optional<Void>> resetHandTask = () -> {
