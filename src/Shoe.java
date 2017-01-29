@@ -47,9 +47,6 @@ public class Shoe {
     }
 
     public boolean removeCard(Card card) {
-        final boolean cardWasRemoved = shoe.remove(card);
-        shuffle();
-
-        return cardWasRemoved;
+        return shoe.remove(card);
     }
 }

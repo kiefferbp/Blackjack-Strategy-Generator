@@ -11,7 +11,7 @@ public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
 
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
-    private static final ExecutorService executor = Executors.newFixedThreadPool(10);
+    private static final ExecutorService executor = Executors.newFixedThreadPool(2 * threadCount);
 
     private int deckCount = 4;
     private double penetrationValue = 1.0;
@@ -33,7 +33,6 @@ public class Decider {
             final Callable<Optional<Void>> resetTask = () -> {
                 player.resetHand();
                 shoe.restoreShoe();
-                shoe.shuffle();
 
                 // get the player's first card
                 Card firstPlayerCard;
@@ -42,11 +41,13 @@ public class Decider {
                     player.addCard(firstPlayerCard);
                     shoe.removeCard(firstPlayerCard);
                 } else {
+                    shoe.shuffle();
                     firstPlayerCard = player.hit();
                 }
 
                 // take out the dealer's card from the shoe
                 shoe.removeCard(dealerCard);
+                shoe.shuffle();
 
                 // the first two cards cannot be a blackjack
                 while (isBlackjackPair(firstPlayerCard, shoe.peekTopCard())) {
@@ -106,6 +107,8 @@ public class Decider {
         for (Card playerCard : playerCards) {
             shoe.removeCard(playerCard);
         }
+
+        shoe.shuffle();
 
         return new Pair<>(shoe, player);
     }
@@ -256,6 +259,7 @@ public class Decider {
             dealer.addCard(dealerCard);
             playerHand1.addCard(playerCard);
             playerHand2.addCard(playerCard);
+            shoe.shuffle();
 
             // each player hand is required to take a second card
             playerHand1.hit();
