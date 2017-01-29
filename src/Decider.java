@@ -11,7 +11,7 @@ public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
 
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
-    private static final ExecutorService executor = Executors.newFixedThreadPool(2 * threadCount);
+    private static final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
     private int deckCount = 4;
     private double penetrationValue = 1.0;
@@ -33,17 +33,10 @@ public class Decider {
             final Callable<Optional<Void>> resetTask = () -> {
                 player.resetHand();
                 shoe.restoreShoe();
+                shoe.shuffle();
 
                 // get the player's first card
-                Card firstPlayerCard;
-                if (targetIsSoft) {
-                    firstPlayerCard = Card.ACE;
-                    player.addCard(firstPlayerCard);
-                    shoe.removeCard(firstPlayerCard);
-                } else {
-                    shoe.shuffle();
-                    firstPlayerCard = player.hit();
-                }
+                final Card firstPlayerCard = player.hit();
 
                 // take out the dealer's card from the shoe
                 shoe.removeCard(dealerCard);
@@ -205,35 +198,21 @@ public class Decider {
             return expectedStandMap.get(scenario);
         }
 
-        final Callable<Double> task = () -> {
-            double unitsWon = 0;
-            for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
-                // generate a random shoe and player hand under this scenario
-                final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
-                final Shoe shoe = shoePlayerPair.get(Shoe.class);
-                final Player player = shoePlayerPair.get(Player.class);
-                final Player dealer = new Player(shoe);
-                dealer.addCard(scenario.dealerCard);
+        double unitsWon = 0;
+        for (int i = 0; i < SIMULATION_COUNT; i++) {
+            // generate a random shoe and player hand under this scenario
+            final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
+            final Shoe shoe = shoePlayerPair.get(Shoe.class);
+            final Player player = shoePlayerPair.get(Player.class);
+            final Player dealer = new Player(shoe);
+            dealer.addCard(scenario.dealerCard);
 
-                // play this scenario out
-                final PlayResult result = simulateStanding(player, dealer, shoe, dealerHitsSoft17);
-                unitsWon += result.getWinAmount();
-            }
-
-            return unitsWon;
-        };
-
-        final List<Callable<Double>> taskList = new ArrayList<>();
-        for (int i = 0; i < threadCount; i++) {
-            taskList.add(task);
+            // play this scenario out
+            final PlayResult result = simulateStanding(player, dealer, shoe, dealerHitsSoft17);
+            unitsWon += result.getWinAmount();
         }
 
-        double totalUnitsWon = 0;
-        for (Future<Double> future : executor.invokeAll(taskList)) {
-            totalUnitsWon += future.get();
-        }
-
-        final double expectedWinnings = totalUnitsWon / (threadCount * Math.ceil(SIMULATION_COUNT / threadCount));
+        final double expectedWinnings = unitsWon / SIMULATION_COUNT;
         System.out.println("standing result (" + scenario + "): " + expectedWinnings);
         expectedStandMap.put(scenario, expectedWinnings);
         return expectedWinnings;

@@ -6,6 +6,10 @@ public class Pair<U, V> {
     private V second;
 
     Pair(U first, V second) {
+        if (first.getClass().equals(second.getClass())) {
+            throw new IllegalArgumentException();
+        }
+
         this.first = first;
         this.second = second;
     }
