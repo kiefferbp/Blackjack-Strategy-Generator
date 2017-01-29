@@ -20,11 +20,13 @@ public class Decider {
         executor.shutdownNow();
     }
 
-    // returns a random hand with the given value with the given softness
-    // NOTE: the caller must verify that this hand is valid for a given shoe.
-    // (e.g., generateHand(21, false) may give [3, 3, 3, 3, 3, 6] which has too many 3's for one deck)
-    private List<Card> generateHandWithValue(final int targetValue, final Card dealerCard, final boolean targetIsSoft) throws Exception {
-        final Callable<List<Card>> task = () -> {
+    // returns a player with a random hand bounded by |scenario|
+    private Player generatePlayer(Scenario scenario) throws Exception {
+        final int targetValue = scenario.playerValue;
+        final Card dealerCard = scenario.dealerCard;
+        final boolean targetIsSoft = scenario.isPlayerSoft;
+
+        final Callable<Player> task = () -> {
             final Shoe shoe = new Shoe(deckCount, penetrationValue);
             final Player player = new Player(shoe);
 
@@ -68,10 +70,10 @@ public class Decider {
                 }
             }
 
-            return player.getCards();
+            return player;
         };
 
-        final List<Callable<List<Card>>> taskList = new ArrayList<>();
+        final List<Callable<Player>> taskList = new ArrayList<>();
         for (int i = 0; i < threadCount; i++) {
             taskList.add(task);
         }
@@ -94,31 +96,18 @@ public class Decider {
                 (card1.getValue() == 10 && card2.equals(Card.ACE)));
     }
 
-    // returns an Object array with two elements: the modified shoe, and the player hand
-    private Object[] getShoePlayerHandPair(Scenario scenario) throws Exception {
+    // returns an Object array with two elements: the modified shoe, and the player
+    //Map.Entry<Shoe, Player> = new Map.Entry<>(new Shoe(), new Player();
+    private Pair<Shoe, Player> getShoePlayerPair(Scenario scenario) throws Exception {
         final Shoe shoe = new Shoe(deckCount, penetrationValue);
+        final Player player = generatePlayer(scenario);
+        final List<Card> playerCards = player.getCards();
 
-        // generate a random player hand
-        List<Card> playerCards = generateHandWithValue(scenario.playerValue, scenario.dealerCard, scenario.isPlayerSoft);
-        final int numOfPlayerCards = playerCards.size();
-
-        // remove each player card if the shoe has the card
-        // if the shoe doesn't have the card, we will need to generate another hand
-        int numCardsRemoved = 0;
         for (Card playerCard : playerCards) {
-            if (!shoe.removeCard(playerCard)) {
-                break;
-            }
-
-            numCardsRemoved += 1;
+            shoe.removeCard(playerCard);
         }
 
-        if (numCardsRemoved != numOfPlayerCards) { // a player card wasn't found in the shoe
-            // retry, which will most likely generate a valid shoe
-            return getShoePlayerHandPair(scenario);
-        }
-
-        return new Object[]{shoe, playerCards};
+        return new Pair<>(shoe, player);
     }
 
     // simulates and returns the PlayResult that occurs when standing under a scenario
@@ -149,7 +138,7 @@ public class Decider {
 
     private PlayResult simulateBestPlay(Player player, Player dealer, Shoe shoe, boolean dealerHitsSoft17) throws Exception {
         final Scenario scenario = buildScenario(player, dealer);
-        final Decision bestDecision = computeBestScenarioResult(scenario, dealerHitsSoft17).getDecision();
+        final Decision bestDecision = computeBestScenarioResult(scenario, dealerHitsSoft17).get(Decision.class);
 
         switch (bestDecision) {
             case HIT:
@@ -183,13 +172,11 @@ public class Decider {
         double unitsWon = 0;
         for (int i = 0; i < SIMULATION_COUNT; i++) {
             // generate a random shoe and player hand under this scenario
-            final Object[] shoePlayerHandPair = getShoePlayerHandPair(scenario);
-            final Shoe shoe = (Shoe) shoePlayerHandPair[0];
-            final Player player = new Player(shoe);
+            final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
+            final Shoe shoe = shoePlayerPair.get(Shoe.class);
+            final Player player = shoePlayerPair.get(Player.class);
             final Player dealer = new Player(shoe);
-            final List<Card> playerHand = (List<Card>) shoePlayerHandPair[1];
             dealer.addCard(scenario.dealerCard);
-            player.addAllCards(playerHand);
 
             // take a hit
             player.hit();
@@ -219,13 +206,11 @@ public class Decider {
             double unitsWon = 0;
             for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
                 // generate a random shoe and player hand under this scenario
-                final Object[] shoePlayerHandPair = getShoePlayerHandPair(scenario);
-                final Shoe shoe = (Shoe) shoePlayerHandPair[0];
-                final Player player = new Player(shoe);
+                final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
+                final Shoe shoe = shoePlayerPair.get(Shoe.class);
+                final Player player = shoePlayerPair.get(Player.class);
                 final Player dealer = new Player(shoe);
-                final List<Card> playerHand = (List<Card>) shoePlayerHandPair[1];
                 dealer.addCard(scenario.dealerCard);
-                player.addAllCards(playerHand);
 
                 // play this scenario out
                 final PlayResult result = simulateStanding(player, dealer, shoe, dealerHitsSoft17);
@@ -284,8 +269,10 @@ public class Decider {
                 final double expectedStandHand2 = getExpectedStandValue(scenarioHand2, dealerHitsSoft17);
                 unitsWon += expectedStandHand1 + expectedStandHand2;
             } else {
-                final double expectedBestHand1 = computeBestScenarioResult(scenarioHand1, dealerHitsSoft17).getValue();
-                final double expectedBestHand2 = computeBestScenarioResult(scenarioHand2, dealerHitsSoft17).getValue();
+                final double expectedBestHand1 =
+                        computeBestScenarioResult(scenarioHand1, dealerHitsSoft17).get(Double.class);
+                final double expectedBestHand2 =
+                        computeBestScenarioResult(scenarioHand2, dealerHitsSoft17).get(Double.class);
                 unitsWon += expectedBestHand1 + expectedBestHand2;
             }
         }
@@ -308,7 +295,7 @@ public class Decider {
         return expectedValueMap;
     }
 
-    public DecisionValuePair computeBestScenarioResult(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
         final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario, dealerHitsSoft17);
 
         Decision bestExpectedDecision = null;
@@ -323,7 +310,7 @@ public class Decider {
             }
         }
 
-        return new DecisionValuePair(bestExpectedDecision, bestExpectedValue);
+        return new Pair<>(bestExpectedDecision, bestExpectedValue);
     }
 
     public static void main(String[] args) throws Exception {
@@ -337,8 +324,8 @@ public class Decider {
         System.out.println("solving " + scenario);
         final long startTime = System.nanoTime();
         final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, false);
-        final DecisionValuePair p = d.computeBestScenarioResult(scenario, false);
-        System.out.println(scenario + " best strategy: " + p.getDecision() + " (" + p.getValue() + ")");
+        final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, false);
+        System.out.println(scenario + " best strategy: " + p.get(Decision.class) + " (" + p.get(Double.class) + ")");
 
         for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
             final Decision entryDecision = entry.getKey();
