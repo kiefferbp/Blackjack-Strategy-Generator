@@ -5,48 +5,75 @@ import java.util.concurrent.ThreadLocalRandom;
  * Created by Brian on 1/17/2017.
  */
 public class Shoe {
-    private Stack<Card> shoe = new Stack<>();
-    private final Stack<Card> originalShoe = new Stack<>();
+    private final Map<Card, Integer> shoeComposition = new HashMap<>();
+    private int cardsInShoe;
+    private int deckCount;
+    private double penetrationValue;
 
     // generates a shoe with the given parameters
     Shoe(int deckCount, double penetrationValue) {
-        for (int i = 0; i < deckCount; i++) {
-            final Stack<Card> deck = Deck.getUnshuffledDeck();
-            shoe.addAll(deck);
-        }
+        this.deckCount = deckCount;
+        this.penetrationValue = penetrationValue;
+        buildShoe();
+    }
 
-        shuffle();
+    private void buildShoe() {
+        cardsInShoe = deckCount * Deck.CARDS_PER_DECK;
+
+        // initialize the deck composition map
+        for (Card card : Card.values()) {
+            // there are four of each card (2, 3, ..., 10/J/Q/K, A) in a deck
+            shoeComposition.put(card, Deck.CARDS_PER_RANK * deckCount);
+        }
 
         // remove cards up to the cut card, which removes [100(1 - |penetrationValue|)]% of the deck
         final int numCardsToRemove = (int) Math.floor((1 - penetrationValue) * deckCount * Deck.CARDS_PER_DECK);
         for (int i = 0; i < numCardsToRemove; i++) {
             removeTopCard();
         }
-
-        // create a copy of the shoe
-        originalShoe.addAll(shoe);
     }
 
-    public Shoe shuffle() {
-        Collections.shuffle(shoe, ThreadLocalRandom.current());
+    public Shoe rebuildShoe() {
+        buildShoe();
         return this;
     }
 
-    public Shoe restoreShoe() {
-        shoe.clear();
-        shoe.addAll(originalShoe);
-        return this;
+    public Card removeCard(Card card) {
+        final int currentCount = shoeComposition.get(card);
+        if (currentCount == 0) {
+            throw new IllegalStateException("Card does not exist in the shoe");
+        } else {
+            shoeComposition.put(card, currentCount - 1);
+            cardsInShoe -= 1;
+        }
+
+        return card;
     }
 
     public Card removeTopCard() {
-        return shoe.pop();
+        final int cumulativeTarget = ThreadLocalRandom.current().nextInt(1, cardsInShoe + 1);
+        int currentCumulative = 0;
+        for (Card card : Card.values()) {
+            final int cardCount = shoeComposition.get(card);
+            currentCumulative += cardCount;
+
+            if (currentCumulative >= cumulativeTarget) {
+                return removeCard(card);
+            }
+        }
+
+        throw new IllegalStateException("Shoe is empty");
     }
 
-    public Card peekTopCard() {
-        return shoe.peek();
-    }
+    public Card putCardBack(Card card) {
+        final int currentCount = shoeComposition.get(card);
+        if (currentCount >= Deck.CARDS_PER_RANK * deckCount) {
+            throw new IllegalStateException("Max cards of this type are already in the deck");
+        } else {
+            shoeComposition.put(card, currentCount + 1);
+            cardsInShoe += 1;
+        }
 
-    public boolean removeCard(Card card) {
-        return shoe.remove(card);
+        return card;
     }
 }

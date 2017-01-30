@@ -21,34 +21,34 @@ public class Decider {
     }
 
     // returns a player with a random hand bounded by |scenario|
-    private Player generatePlayer(Scenario scenario) throws Exception {
+    private Pair<Shoe, Player> getShoePlayerPair(Scenario scenario) throws Exception {
         final int targetValue = scenario.playerValue;
         final Card dealerCard = scenario.dealerCard;
         final boolean targetIsSoft = scenario.isPlayerSoft;
 
-        final Callable<Player> task = () -> {
+        final Callable<Pair<Shoe, Player>> task = () -> {
             final Shoe shoe = new Shoe(deckCount, penetrationValue);
             final Player player = new Player(shoe);
 
             final Callable<Optional<Void>> resetTask = () -> {
                 player.resetHand();
-                shoe.restoreShoe();
-                shoe.shuffle();
+                shoe.rebuildShoe();
 
                 // get the player's first card
                 final Card firstPlayerCard = player.hit();
 
                 // take out the dealer's card from the shoe
                 shoe.removeCard(dealerCard);
-                shoe.shuffle();
 
                 // the first two cards cannot be a blackjack
-                while (isBlackjackPair(firstPlayerCard, shoe.peekTopCard())) {
-                    shoe.shuffle();
+                Card secondPlayerCard = shoe.removeTopCard();
+                while (isBlackjackPair(firstPlayerCard, secondPlayerCard)) {
+                    shoe.putCardBack(secondPlayerCard);
+                    secondPlayerCard = shoe.removeTopCard();
                 }
 
-                // give the player a second card
-                player.hit();
+                // give the player this second card
+                player.addCard(secondPlayerCard);
 
                 // to appease the Java overlords
                 return Optional.empty();
@@ -64,10 +64,10 @@ public class Decider {
                 }
             }
 
-            return player;
+            return new Pair<>(shoe, player);
         };
 
-        final List<Callable<Player>> taskList = new ArrayList<>();
+        final List<Callable<Pair<Shoe, Player>>> taskList = new ArrayList<>();
         for (int i = 0; i < threadCount; i++) {
             taskList.add(task);
         }
@@ -90,30 +90,19 @@ public class Decider {
                 (card1.getValue() == 10 && card2.equals(Card.ACE)));
     }
 
-    // returns an Object array with two elements: the modified shoe, and the player
-    //Map.Entry<Shoe, Player> = new Map.Entry<>(new Shoe(), new Player();
-    private Pair<Shoe, Player> getShoePlayerPair(Scenario scenario) throws Exception {
-        final Shoe shoe = new Shoe(deckCount, penetrationValue);
-        final Player player = generatePlayer(scenario);
-        final List<Card> playerCards = player.getCards();
-
-        for (Card playerCard : playerCards) {
-            shoe.removeCard(playerCard);
-        }
-
-        shoe.shuffle();
-
-        return new Pair<>(shoe, player);
-    }
-
     // simulates and returns the PlayResult that occurs when standing under a scenario
     private PlayResult simulateStanding(Player player, Player dealer, Shoe shoe, boolean dealerHitsSoft17) throws Exception {
         // if the dealer has an Ace or a 10-valued card, the card at the top of the shoe cannot give him a blackjack
         // if the top card yields a BJ, shuffle the shoe until it no longer does
-        final Card dealerCard = dealer.getCards().get(0); // the dealer only has one card right now
-        while (isBlackjackPair(dealerCard, shoe.peekTopCard())) {
-            shoe.shuffle();
+        final Card firstDealerCard = dealer.getCards().get(0); // the dealer only has one card right now
+        Card secondDealerCard = shoe.removeTopCard();
+        while (isBlackjackPair(firstDealerCard, secondDealerCard)) {
+            shoe.putCardBack(secondDealerCard);
+            secondDealerCard = shoe.removeTopCard();
         }
+
+        // give the dealer his second card
+        dealer.addCard(secondDealerCard);
 
         // play out the dealer's hand
         while (dealer.getHandValue() < 17 || (dealer.getHandValue() == 17 && dealer.handIsSoft() && dealerHitsSoft17)) {
@@ -125,7 +114,7 @@ public class Decider {
         final int playerValue = player.getHandValue();
         if (playerValue > finalDealerValue || finalDealerValue > 21) {
             return PlayResult.WIN;
-        } else if (playerValue < dealer.getHandValue()) {
+        } else if (playerValue < finalDealerValue) {
             return PlayResult.LOSE;
         } else {
             return PlayResult.PUSH;
@@ -238,7 +227,6 @@ public class Decider {
             dealer.addCard(dealerCard);
             playerHand1.addCard(playerCard);
             playerHand2.addCard(playerCard);
-            shoe.shuffle();
 
             // each player hand is required to take a second card
             playerHand1.hit();

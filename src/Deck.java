@@ -5,7 +5,7 @@ import java.util.*;
  */
 public class Deck {
     public static final int CARDS_PER_DECK = 52;
-    private static final int MAX_CARDS_PER_RANK = 4;
+    public static final int CARDS_PER_RANK = 4;
     private static Stack<Card> unshuffledDeck = null;
 
     private Deck() {}
@@ -15,7 +15,7 @@ public class Deck {
             unshuffledDeck = new Stack<>();
 
             // push four of each of 2, 3, ..., 10, J/Q/K, A in order to the deck
-            for (int i = 0; i < MAX_CARDS_PER_RANK; i++) {
+            for (int i = 0; i < CARDS_PER_RANK; i++) {
                 for (Card card : Card.values()) {
                     unshuffledDeck.push(card);
                 }
