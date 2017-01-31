@@ -5,6 +5,9 @@ import java.util.concurrent.ThreadLocalRandom;
  * Created by Brian on 1/17/2017.
  */
 public class Shoe {
+    public static final int CARDS_PER_DECK = 52;
+    public static final int CARDS_PER_RANK = 4;
+
     private final Map<Card, Integer> shoeComposition = new HashMap<>();
     private int cardsInShoe;
     private int deckCount;
@@ -18,16 +21,16 @@ public class Shoe {
     }
 
     private void buildShoe() {
-        cardsInShoe = deckCount * Deck.CARDS_PER_DECK;
+        cardsInShoe = deckCount * CARDS_PER_DECK;
 
         // initialize the deck composition map
         for (Card card : Card.values()) {
             // there are four of each card (2, 3, ..., 10/J/Q/K, A) in a deck
-            shoeComposition.put(card, Deck.CARDS_PER_RANK * deckCount);
+            shoeComposition.put(card, CARDS_PER_RANK * deckCount);
         }
 
         // remove cards up to the cut card, which removes [100(1 - |penetrationValue|)]% of the deck
-        final int numCardsToRemove = (int) Math.floor((1 - penetrationValue) * deckCount * Deck.CARDS_PER_DECK);
+        final int numCardsToRemove = (int) Math.floor((1 - penetrationValue) * deckCount * CARDS_PER_DECK);
         for (int i = 0; i < numCardsToRemove; i++) {
             removeTopCard();
         }

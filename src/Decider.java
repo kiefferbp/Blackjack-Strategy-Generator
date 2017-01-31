@@ -1,8 +1,5 @@
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 
 /**
  * Created by Brian on 1/17/2017.
@@ -13,15 +10,46 @@ public class Decider {
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
     private static final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
-    private int deckCount = 4;
-    private double penetrationValue = 1.0;
+    private int deckCount;
+    private double penetrationValue;
 
+    /**
+     * Constructor.
+     *
+     * @param deckCount the number of decks in the shoe
+     * @param penetrationValue a number from 0 to 1 that represents the proportion of the shoe
+     *                         that play is made through. For example, if the penetration is 80%, 20% of the cards
+     *                         in the shoe are removed.
+     * @throws IllegalStateException if the ExecutorService used to generate hands has been shut down
+     */
+    Decider(int deckCount, double penetrationValue) {
+        if (executor.isShutdown()) {
+            throw new IllegalStateException("ExecutorService has been shut down already");
+        }
+        this.deckCount = deckCount;
+        this.penetrationValue = penetrationValue;
+    }
+
+    /**
+     * Shuts down the threads used to generate a player hand. This should be called only after you are through with
+     * using deciders.
+     */
     public static void shutDownThreads() {
         executor.shutdownNow();
     }
 
-    // returns a player with a random hand bounded by |scenario|
-    private Pair<Shoe, Player> getShoePlayerPair(Scenario scenario) throws Exception {
+    /**
+     * Generates a random shoe-player pair that corresponds with the setup given by the provided scenario
+     * (player hand value/softness, dealer card, and whether the hand is a pair). All pairs generated should appear as
+     * likely as they would in a normal game of Blackjack. Like in actual play, the dealer's card affects the outcome
+     * of all cards beyond the player's first.
+     *
+     * @param scenario the scenario to generate a random hand for
+     * @return a shoe-player pair that corresponds with the scenario
+     * @throws InterruptedException if a thread used to generate a hand is interrupted
+     * @throws ExecutionException if a thread throws an exception for some reason
+     */
+    private Pair<Shoe, Player> getShoePlayerPair(Scenario scenario) throws InterruptedException, ExecutionException {
         final int targetValue = scenario.playerValue;
         final Card dealerCard = scenario.dealerCard;
         final boolean targetIsSoft = scenario.isPlayerSoft;
@@ -75,6 +103,13 @@ public class Decider {
         return executor.invokeAny(taskList);
     }
 
+    /**
+     * Builds a scenario (an encapsulation of the player's hand total and the dealer's up-card)
+     * given a player and dealer.
+     * @param player the player of the scenario
+     * @param dealer the dealer of the scenario
+     * @return a <tt>Scenario</tt> that encapsulates the state of the player and dealer
+     */
     private Scenario buildScenario(Player player, Player dealer) {
         final Scenario scenario = new Scenario();
         scenario.playerValue = player.getHandValue();
@@ -85,13 +120,29 @@ public class Decider {
         return scenario;
     }
 
+    /**
+     * A helper function that returns whether two cards represent a Blackjack
+     * @param card1 the first card
+     * @param card2 the second card
+     * @return true if <tt>card1</tt> and <tt>card2</tt> make a Blackjack, and false otherwise.
+     */
     private boolean isBlackjackPair(Card card1, Card card2) {
         return ((card1.equals(Card.ACE) && card2.getValue() == 10) ||
                 (card1.getValue() == 10 && card2.equals(Card.ACE)));
     }
 
-    // simulates and returns the PlayResult that occurs when standing under a scenario
-    private PlayResult simulateStanding(Player player, Player dealer, Shoe shoe, boolean dealerHitsSoft17) throws Exception {
+    /**
+     * Performs a simulation of what occurs when a player stands and the dealer plays out his hand.
+     * @param player the player who is standing on his hand
+     * @param dealer the dealer
+     * @param shoe the shoe that the player and dealer are using
+     * @param dealerHitsSoft17 <tt>true</tt> if the dealer hits a soft 17, <tt>false</tt> if he stands on a soft 17
+     * @return the result of standing (win, lose, push) under this simulation
+     */
+    private PlayResult simulateStanding(Player player,
+                                        Player dealer,
+                                        Shoe shoe,
+                                        boolean dealerHitsSoft17) {
         // if the dealer has an Ace or a 10-valued card, the card at the top of the shoe cannot give him a blackjack
         // if the top card yields a BJ, shuffle the shoe until it no longer does
         final Card firstDealerCard = dealer.getCards().get(0); // the dealer only has one card right now
@@ -121,7 +172,18 @@ public class Decider {
         }
     }
 
-    private PlayResult simulateBestPlay(Player player, Player dealer, Shoe shoe, boolean dealerHitsSoft17) throws Exception {
+    /**
+     * Performs a simulation of what occurs when a player makes the best decisions when playing his hand.
+     * @param player the player
+     * @param dealer the dealer
+     * @param shoe the shoe that the player and dealer are using
+     * @param dealerHitsSoft17 <tt>true</tt> if the dealer hits a soft 17, <tt>false</tt> if he stands on a soft 17
+     * @return the result of perfect play (win, lose, push) under this simulation
+     */
+    private PlayResult simulateBestPlay(Player player,
+                                        Player dealer,
+                                        Shoe shoe,
+                                        boolean dealerHitsSoft17) throws InterruptedException, ExecutionException {
         final Scenario scenario = buildScenario(player, dealer);
         final Decision bestDecision = computeBestScenarioResult(scenario, dealerHitsSoft17).get(Decision.class);
 
@@ -143,7 +205,8 @@ public class Decider {
     }
 
     private final Map<Scenario, Double> expectedHitMap = new HashMap<>(); // for memoization
-    private double getExpectedHitValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+    private double getExpectedHitValue(Scenario scenario, boolean dealerHitsSoft17)
+            throws InterruptedException, ExecutionException {
         if (expectedHitMap.get(scenario) != null) {
             return expectedHitMap.get(scenario);
         }
@@ -181,8 +244,21 @@ public class Decider {
         return expectedWinnings;
     }
 
+
     private final Map<Scenario, Double> expectedStandMap = new HashMap<>(); // for memoization
-    private double getExpectedStandValue(final Scenario scenario, final boolean dealerHitsSoft17) throws Exception {
+
+    /**
+     * Computes the expected value of standing under a given scenario (an encapsulation of the player's hand total
+     * and the dealer's up-card).
+     *
+     * @param scenario the scenario to compute the expected value for
+     * @param dealerHitsSoft17 <tt>true</tt> if the dealer hits a soft 17, <tt>false</tt> if he stands on a soft 17
+     * @return a double from -2 to 2 representing the average win amount
+     * @throws InterruptedException if a thread used to generate a hand is interrupted
+     * @throws ExecutionException if a thread throws an exception for some reason
+     */
+    private double getExpectedStandValue(final Scenario scenario, final boolean dealerHitsSoft17)
+            throws InterruptedException, ExecutionException {
         if (expectedStandMap.get(scenario) != null) {
             return expectedStandMap.get(scenario);
         }
@@ -207,7 +283,8 @@ public class Decider {
         return expectedWinnings;
     }
 
-    private double getExpectedSplitValue(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+    private double getExpectedSplitValue(Scenario scenario, boolean dealerHitsSoft17)
+            throws InterruptedException, ExecutionException {
         if (!scenario.isPair) { // can't split
             return Integer.MIN_VALUE;
         }
@@ -252,7 +329,8 @@ public class Decider {
     }
 
     private final Map<Scenario, Map<Decision, Double>> scenarioExpectedValues = new HashMap<>();
-    public Map<Decision, Double> computeExpectedValues(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+    public Map<Decision, Double> computeExpectedValues(Scenario scenario, boolean dealerHitsSoft17)
+            throws InterruptedException, ExecutionException {
         if (scenarioExpectedValues.get(scenario) != null) {
             return scenarioExpectedValues.get(scenario);
         }
@@ -266,7 +344,8 @@ public class Decider {
         return expectedValueMap;
     }
 
-    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean dealerHitsSoft17) throws Exception {
+    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean dealerHitsSoft17)
+            throws InterruptedException, ExecutionException {
         final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario, dealerHitsSoft17);
 
         Decision bestExpectedDecision = null;
@@ -284,8 +363,8 @@ public class Decider {
         return new Pair<>(bestExpectedDecision, bestExpectedValue);
     }
 
-    public static void main(String[] args) throws Exception {
-        final Decider d = new Decider();
+    public static void main(String[] args) {
+        final Decider d = new Decider(4, 1.0);
         final Scenario scenario = new Scenario();
         scenario.playerValue = 16;
         scenario.isPlayerSoft = false;
@@ -294,19 +373,25 @@ public class Decider {
 
         System.out.println("solving " + scenario);
         final long startTime = System.nanoTime();
-        final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, false);
-        final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, false);
-        System.out.println(scenario + " best strategy: " + p.get(Decision.class) + " (" + p.get(Double.class) + ")");
 
-        for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
-            final Decision entryDecision = entry.getKey();
-            final double entryExpectedValue = entry.getValue();
+        try {
+            final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, false);
+            final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, false);
+            System.out.println(scenario + " best strategy: " + p.get(Decision.class) + " (" + p.get(Double.class) + ")");
 
-            System.out.println("Expected value of " + entryDecision + ": " + entryExpectedValue);
+            for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
+                final Decision entryDecision = entry.getKey();
+                final double entryExpectedValue = entry.getValue();
+
+                System.out.println("Expected value of " + entryDecision + ": " + entryExpectedValue);
+            }
+
+            final long endTime = System.nanoTime();
+            System.out.println("Computation time: " + (endTime - startTime) / 1000000000.0 + "s");
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        } finally {
+            Decider.shutDownThreads();
         }
-
-        Decider.shutDownThreads();
-        final long endTime = System.nanoTime();
-        System.out.println("Computation time: " + (endTime - startTime)/1000000000.0 + "s");
     }
 }
