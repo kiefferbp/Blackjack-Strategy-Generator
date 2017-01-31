@@ -313,7 +313,7 @@ public class Decider {
      */
     private double getExpectedStandValue(final Scenario scenario, final boolean dealerHitsSoft17)
             throws InterruptedException, ExecutionException, Exception {
-        final Semaphore standSemaphore = hitSemaphoreMap.get(scenario);
+        final Semaphore standSemaphore = standSemaphoreMap.get(scenario);
         standSemaphore.acquire();
 
         if (expectedStandMap.get(scenario) != null) {
@@ -358,51 +358,71 @@ public class Decider {
         return expectedWinnings;
     }
 
+    private final Map<Scenario, Double> expectedSplitMap = new HashMap<>(); // for memoization
     private double getExpectedSplitValue(Scenario scenario, boolean dealerHitsSoft17)
             throws InterruptedException, ExecutionException, Exception {
+
         if (!scenario.isPair) { // can't split
+            expectedSplitMap.put(scenario, (double) Integer.MIN_VALUE);
             return Integer.MIN_VALUE;
         }
 
-        double unitsWon = 0;
-        for (int i = 0; i < SIMULATION_COUNT; i++) {
-            currentSimulationNum.incrementAndGet();
+        final Callable<Double> task = () -> {
+            double unitsWon = 0;
+            for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
+                currentSimulationNum.incrementAndGet();
 
-            final Shoe shoe = new Shoe(deckCount, penetrationValue);
-            final Card playerCard = Card.getCardWithValue(scenario.playerValue / 2);
-            final Card dealerCard = scenario.dealerCard;
-            shoe.removeCard(playerCard);
-            shoe.removeCard(playerCard);
-            shoe.removeCard(dealerCard);
+                final Shoe shoe = new Shoe(deckCount, penetrationValue);
+                final Card playerCard = Card.getCardWithValue(scenario.playerValue / 2);
+                final Card dealerCard = scenario.dealerCard;
+                shoe.removeCard(playerCard);
+                shoe.removeCard(playerCard);
+                shoe.removeCard(dealerCard);
 
-            final Player playerHand1 = new Player(shoe);
-            final Player playerHand2 = new Player(shoe);
-            final Player dealer = new Player(shoe);
-            dealer.addCard(dealerCard);
-            playerHand1.addCard(playerCard);
-            playerHand2.addCard(playerCard);
+                final Player playerHand1 = new Player(shoe);
+                final Player playerHand2 = new Player(shoe);
+                final Player dealer = new Player(shoe);
+                dealer.addCard(dealerCard);
+                playerHand1.addCard(playerCard);
+                playerHand2.addCard(playerCard);
 
-            // each player hand is required to take a second card
-            playerHand1.hit();
-            playerHand2.hit();
+                // each player hand is required to take a second card
+                playerHand1.hit();
+                playerHand2.hit();
 
-            final Scenario scenarioHand1 = buildScenario(playerHand1, dealer);
-            final Scenario scenarioHand2 = buildScenario(playerHand2, dealer);
-            if (playerCard.equals(Card.ACE)) {
-                // if we split aces, we cannot take more cards
-                final double expectedStandHand1 = getExpectedStandValue(scenarioHand1, dealerHitsSoft17);
-                final double expectedStandHand2 = getExpectedStandValue(scenarioHand2, dealerHitsSoft17);
-                unitsWon += expectedStandHand1 + expectedStandHand2;
-            } else {
-                final double expectedBestHand1 =
-                        computeBestScenarioResult(scenarioHand1, dealerHitsSoft17).get(Double.class);
-                final double expectedBestHand2 =
-                        computeBestScenarioResult(scenarioHand2, dealerHitsSoft17).get(Double.class);
-                unitsWon += expectedBestHand1 + expectedBestHand2;
+                final Scenario scenarioHand1 = buildScenario(playerHand1, dealer);
+                final Scenario scenarioHand2 = buildScenario(playerHand2, dealer);
+                if (playerCard.equals(Card.ACE)) {
+                    // if we split aces, we cannot take more cards
+                    final double expectedStandHand1 = getExpectedStandValue(scenarioHand1, dealerHitsSoft17);
+                    final double expectedStandHand2 = getExpectedStandValue(scenarioHand2, dealerHitsSoft17);
+                    unitsWon += expectedStandHand1 + expectedStandHand2;
+                } else {
+                    final double expectedBestHand1 =
+                            computeBestScenarioResult(scenarioHand1, dealerHitsSoft17).get(Double.class);
+                    final double expectedBestHand2 =
+                            computeBestScenarioResult(scenarioHand2, dealerHitsSoft17).get(Double.class);
+                    unitsWon += expectedBestHand1 + expectedBestHand2;
+                }
             }
+
+            return unitsWon;
+        };
+
+        final List<Callable<Double>> taskList = new ArrayList<>();
+        for (int i = 0; i < threadCount; i++) {
+            taskList.add(task);
         }
 
-        return unitsWon / SIMULATION_COUNT;
+        double totalUnitsWon = 0.0;
+        for (Future<Double> future : executor.invokeAll(taskList)) {
+            totalUnitsWon += future.get();
+        }
+
+        final double expectedWinnings = totalUnitsWon / (threadCount * Math.ceil(SIMULATION_COUNT / threadCount));
+        System.out.println("splitting result (" + scenario + "): " + expectedWinnings);
+        expectedSplitMap.put(scenario, expectedWinnings);
+        return expectedWinnings;
     }
 
     private final Map<Scenario, Map<Decision, Double>> scenarioExpectedValues = new HashMap<>();
