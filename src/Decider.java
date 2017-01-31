@@ -10,12 +10,15 @@ public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
 
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
-    private static final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    private static final ExecutorService executor = Executors.newCachedThreadPool();
     private AtomicLong currentSimulationNum = new AtomicLong(0);
 
     private int deckCount;
     private double penetrationValue;
     private List<Runnable> statusListeners;
+    private Map<Scenario, Semaphore> hitSemaphoreMap = new HashMap<>();
+    private Map<Scenario, Semaphore> standSemaphoreMap = new HashMap<>();
+    private Map<Scenario, Semaphore> splitSemaphoreMap = new HashMap<>();
 
     /**
      * Constructor.
@@ -30,9 +33,30 @@ public class Decider {
         if (executor.isShutdown()) {
             throw new IllegalStateException("ExecutorService has been shut down already");
         }
+
         this.deckCount = deckCount;
         this.penetrationValue = penetrationValue;
         this.statusListeners = new ArrayList<>();
+
+        // init the semaphore maps
+        // some don't make sense and are never used, but let's go with it
+        for (int playerValue = 4; playerValue <= 21; playerValue++) {
+            for (Card dealerCard : Card.values()) {
+                for (boolean isPlayerSoft : new boolean[]{true, false}) {
+                    for (boolean isPair : new boolean[]{true, false}) {
+                        final Scenario scenario = new Scenario();
+                        scenario.playerValue = playerValue;
+                        scenario.dealerCard = dealerCard;
+                        scenario.isPlayerSoft = isPlayerSoft;
+                        scenario.isPair = isPair;
+
+                        hitSemaphoreMap.put(scenario, new Semaphore(1));
+                        standSemaphoreMap.put(scenario, new Semaphore(1));
+                        splitSemaphoreMap.put(scenario, new Semaphore(1));
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -74,7 +98,7 @@ public class Decider {
         final Shoe shoe = new Shoe(deckCount, penetrationValue);
         final Player player = new Player(shoe);
 
-        final Callable<Optional<Void>> resetTask = () -> {
+        final Callable<?> resetTask = () -> {
             player.resetHand();
             shoe.rebuildShoe();
 
@@ -215,42 +239,62 @@ public class Decider {
     private final Map<Scenario, Double> expectedHitMap = new HashMap<>(); // for memoization
     private double getExpectedHitValue(Scenario scenario, boolean dealerHitsSoft17)
             throws InterruptedException, ExecutionException, Exception {
+        final Semaphore hitSemaphore = hitSemaphoreMap.get(scenario);
+        hitSemaphore.acquire();
+
         if (expectedHitMap.get(scenario) != null) {
+            hitSemaphore.release();
             return expectedHitMap.get(scenario);
         }
 
         // base case: the player is guaranteed to bust if he hits a hard 21
         if (scenario.playerValue == 21 && !scenario.isPlayerSoft) {
             expectedHitMap.put(scenario, -1.0);
+            hitSemaphore.release();
             return -1.0;
         }
 
-        double unitsWon = 0;
-        for (int i = 0; i < SIMULATION_COUNT; i++) {
-            currentSimulationNum.incrementAndGet();
+        final Callable<Double> task = () -> {
+            double unitsWon = 0;
+            for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
+                currentSimulationNum.incrementAndGet();
 
-            // generate a random shoe and player hand under this scenario
-            final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
-            final Shoe shoe = shoePlayerPair.get(Shoe.class);
-            final Player player = shoePlayerPair.get(Player.class);
-            final Player dealer = new Player(shoe);
-            dealer.addCard(scenario.dealerCard);
+                // generate a random shoe and player hand under this scenario
+                final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
+                final Shoe shoe = shoePlayerPair.get(Shoe.class);
+                final Player player = shoePlayerPair.get(Player.class);
+                final Player dealer = new Player(shoe);
+                dealer.addCard(scenario.dealerCard);
 
-            // take a hit
-            player.hit();
+                // take a hit
+                player.hit();
 
-            if (player.getHandValue() > 21) {
-                unitsWon -= 1;
-            } else {
-                // inductive step: simulate best play on the new hand
-                final PlayResult bestPlayResult = simulateBestPlay(player, dealer, shoe, dealerHitsSoft17);
-                unitsWon += bestPlayResult.getWinAmount();
+                if (player.getHandValue() > 21) {
+                    unitsWon -= 1;
+                } else {
+                    // inductive step: simulate best play on the new hand
+                    final PlayResult bestPlayResult = simulateBestPlay(player, dealer, shoe, dealerHitsSoft17);
+                    unitsWon += bestPlayResult.getWinAmount();
+                }
             }
+
+            return unitsWon;
+        };
+
+        final List<Callable<Double>> taskList = new ArrayList<>();
+        for (int i = 0; i < threadCount; i++) {
+            taskList.add(task);
         }
 
-        final double expectedWinnings = unitsWon / SIMULATION_COUNT;
+        double totalUnitsWon = 0.0;
+        for (Future<Double> future : executor.invokeAll(taskList)) {
+            totalUnitsWon += future.get();
+        }
+
+        final double expectedWinnings = totalUnitsWon / SIMULATION_COUNT;
         System.out.println("hitting result (" + scenario + "): " + expectedWinnings);
         expectedHitMap.put(scenario, expectedWinnings);
+        hitSemaphore.release();
         return expectedWinnings;
     }
 
@@ -269,7 +313,11 @@ public class Decider {
      */
     private double getExpectedStandValue(final Scenario scenario, final boolean dealerHitsSoft17)
             throws InterruptedException, ExecutionException, Exception {
+        final Semaphore standSemaphore = hitSemaphoreMap.get(scenario);
+        standSemaphore.acquire();
+
         if (expectedStandMap.get(scenario) != null) {
+            standSemaphore.release();
             return expectedStandMap.get(scenario);
         }
 
@@ -306,6 +354,7 @@ public class Decider {
         final double expectedWinnings = totalUnitsWon / (threadCount * Math.ceil(SIMULATION_COUNT / threadCount));
         System.out.println("standing result (" + scenario + "): " + expectedWinnings);
         expectedStandMap.put(scenario, expectedWinnings);
+        standSemaphore.release();
         return expectedWinnings;
     }
 
@@ -367,8 +416,8 @@ public class Decider {
         expectedValueMap.put(Decision.HIT, getExpectedHitValue(scenario, dealerHitsSoft17));
         expectedValueMap.put(Decision.STAND, getExpectedStandValue(scenario, dealerHitsSoft17));
         expectedValueMap.put(Decision.SPLIT, getExpectedSplitValue(scenario, dealerHitsSoft17));
-
         scenarioExpectedValues.put(scenario, expectedValueMap);
+
         return expectedValueMap;
     }
 
