@@ -1,6 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.concurrent.Future;
 
 /**
  * Created by Brian on 1/30/2017.
@@ -43,7 +44,7 @@ public class GUI {
 
         frame.setMinimumSize(new Dimension(600, 300));
         frame.setLayout(new GridLayout(0, 1));
-        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        //frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
         final JPanel playerPanel = new JPanel(new FlowLayout());
         playerPanel.add(new JLabel("Player hand:"));
@@ -62,6 +63,7 @@ public class GUI {
         frame.pack();
         frame.setVisible(true);
 
+        final Decider d = new Decider(400, 1.0);
         solveButton.addActionListener((e) -> {
             new Thread(() -> {
                 // get the info required to build a scenario
@@ -82,8 +84,7 @@ public class GUI {
                 scenario.isPair = isPair;
 
                 // solve
-                final Decider d = new Decider(400, 1.0);
-                d.addStatusListener((opsPerSecond) -> {
+                final Future<?> statusUpdater = d.addStatusListener((opsPerSecond) -> {
                     status.setText("solving " + scenario + " (" + opsPerSecond + " hands per second)");
                 });
 
@@ -96,7 +97,7 @@ public class GUI {
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 } finally {
-                    Decider.shutDownThreads();
+                    statusUpdater.cancel(true);
                 }
             }).start();
         });

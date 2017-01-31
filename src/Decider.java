@@ -10,7 +10,7 @@ public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
 
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
-    private static final ExecutorService executor = Executors.newFixedThreadPool(threadCount + 10);
+    private static final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
     private AtomicLong currentSimulationNum = new AtomicLong(0);
 
     private int deckCount;
