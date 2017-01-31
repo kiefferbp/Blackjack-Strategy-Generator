@@ -69,8 +69,10 @@ public class GUI {
                 final int playerValue = Integer.valueOf(selectedPlayerHand.split(" ")[1]);
                 final boolean isSoft = selectedPlayerHand.split(" ")[0].equals("Soft");
                 final boolean isPair = isPairBox.isSelected();
-                final int dealerCardValue = Integer.valueOf((String) dealerBox.getSelectedItem());
-                final Card dealerCard = Card.getCardWithValue(dealerCardValue);
+                final String selectedDealerCard = (String) dealerBox.getSelectedItem();
+                final Card dealerCard = selectedDealerCard.equals("Ace")
+                        ? Card.ACE
+                        : Card.getCardWithValue(Integer.valueOf(selectedDealerCard));
 
                 // build it
                 final Scenario scenario = new Scenario();
@@ -80,14 +82,17 @@ public class GUI {
                 scenario.isPair = isPair;
 
                 // solve
-                final Decider d = new Decider(4, 1.0);
+                final Decider d = new Decider(400, 1.0);
                 d.addStatusListener((opsPerSecond) -> {
                     status.setText("solving " + scenario + " (" + opsPerSecond + " hands per second)");
                 });
 
                 try {
+                    final long startTime = System.nanoTime();
                     final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, false);
+                    final long endTime = System.nanoTime();
                     status.setText(scenario + " best strategy: " + p.get(Decision.class) + " (" + p.get(Double.class) + ")");
+                    System.out.println("Computation time: " + (endTime - startTime) / 1000000000.0 + "s");
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 } finally {
