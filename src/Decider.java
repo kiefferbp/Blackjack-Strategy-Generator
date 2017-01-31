@@ -1,5 +1,6 @@
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 /**
  * Created by Brian on 1/17/2017.
@@ -7,11 +8,13 @@ import java.util.concurrent.*;
 public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
 
-    private static final int threadCount = Runtime.getRuntime().availableProcessors();
-    private static final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    private static final int threadCount = Runtime.getRuntime().availableProcessors() - 3;
+    private static final ExecutorService executor = Executors.newFixedThreadPool(threadCount + 10);
+    private long currentSimulationNum = 0;
 
     private int deckCount;
     private double penetrationValue;
+    private List<Runnable> statusListeners;
 
     /**
      * Constructor.
@@ -28,6 +31,7 @@ public class Decider {
         }
         this.deckCount = deckCount;
         this.penetrationValue = penetrationValue;
+        this.statusListeners = new ArrayList<>();
     }
 
     /**
@@ -36,6 +40,17 @@ public class Decider {
      */
     public static void shutDownThreads() {
         executor.shutdownNow();
+    }
+
+    public Future<?> addStatusListener(Consumer<Long> listener) {
+        return executor.submit(() -> {
+            long lastSimulationNum = currentSimulationNum;
+            while (true) {
+                listener.accept(currentSimulationNum - lastSimulationNum);
+                lastSimulationNum = currentSimulationNum;
+                Thread.sleep(1000);
+            }
+        });
     }
 
     /**
@@ -219,6 +234,8 @@ public class Decider {
 
         double unitsWon = 0;
         for (int i = 0; i < SIMULATION_COUNT; i++) {
+            currentSimulationNum++;
+
             // generate a random shoe and player hand under this scenario
             final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
             final Shoe shoe = shoePlayerPair.get(Shoe.class);
@@ -265,6 +282,8 @@ public class Decider {
 
         double unitsWon = 0;
         for (int i = 0; i < SIMULATION_COUNT; i++) {
+            currentSimulationNum++;
+
             // generate a random shoe and player hand under this scenario
             final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
             final Shoe shoe = shoePlayerPair.get(Shoe.class);
@@ -291,6 +310,8 @@ public class Decider {
 
         double unitsWon = 0;
         for (int i = 0; i < SIMULATION_COUNT; i++) {
+            currentSimulationNum++;
+
             final Shoe shoe = new Shoe(deckCount, penetrationValue);
             final Card playerCard = Card.getCardWithValue(scenario.playerValue / 2);
             final Card dealerCard = scenario.dealerCard;
