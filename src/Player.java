@@ -11,6 +11,12 @@ public class Player {
     private int aceCount = 0;
     private Shoe shoe;
 
+    // for caching purposes
+    private int cachedPlayerValue = 0;
+    private boolean cachedPlayerSoftness = false;
+    private boolean playerValueIsCached = true;
+    private boolean playerSoftnessIsCached = true;
+
     Player() {} // for construction purposes
 
     Player(Shoe shoe) {
@@ -51,21 +57,30 @@ public class Player {
     }
 
     public boolean handIsSoft() {
-        // compute the value of the dealer's hand without any aces
-        final int valueWithNoAces = getHandValueWithoutAces();
+        if (!playerSoftnessIsCached) {
+            // set the softness cached flag
+            playerSoftnessIsCached = true;
 
-        if (valueWithNoAces >= 11) {
-            return false; // as any ace in this scenario must count as a 1
+            // compute the value of the dealer's hand without any aces
+            final int valueWithNoAces = getHandValueWithoutAces();
+
+            // Explanation: the hand is soft if at least one ace can count as an 11 (e.g., an ace can contribute 10 more points).
+            // If the value of the hand without aces is >= 11, any ace in the hand must count as a 1 and the hand is hard.
+            // Also, since the value of a hand must be <= 21 an ace can only contribute 10 more points if the total when
+            // counting aces as 1's is <= 11.
+            cachedPlayerSoftness = (valueWithNoAces < 11 && aceCount >= 1 && (valueWithNoAces + aceCount <= 11));
         }
 
-        // Explanation: the hand is soft if at least one ace can count as an 11 (e.g., an ace can contribute 10 more points).
-        // Since the value of a hand must be <= 21, this can only occur if the total when counting aces as 1's is <= 11.
-        return (aceCount >= 1 && valueWithNoAces + aceCount <= 11);
+        return cachedPlayerSoftness;
     }
 
     public Card hit() {
         Card cardObtained = shoe.removeTopCard();
         addCard(cardObtained);
+
+        // reset the cached flags
+        playerValueIsCached = false;
+        playerSoftnessIsCached = false;
 
         return cardObtained;
     }
@@ -76,23 +91,28 @@ public class Player {
     }
 
     public int getHandValue() {
-        // begin considering the value of the cards that are not aces
-        int handValue = getHandValueWithoutAces();
+        if (!playerValueIsCached) {
+            // set the hand value cached flag
+            playerValueIsCached = true;
 
-        if (handIsSoft()) {
-            // there is at least one ace in the hand, and only one ace can contribute 11 points
-            handValue += 11;
+            // begin considering the value of the cards that are not aces
+            cachedPlayerValue = getHandValueWithoutAces();
 
-            if (aceCount > 1) {
-                // all other aces count as 1 point
-                handValue += aceCount - 1;
+            if (handIsSoft()) {
+                // there is at least one ace in the hand, and only one ace can contribute 11 points
+                cachedPlayerValue += 11;
+
+                if (aceCount > 1) {
+                    // all other aces count as 1 point
+                    cachedPlayerValue += aceCount - 1;
+                }
+            } else {
+                // all aces must count as 1 point
+                cachedPlayerValue += aceCount;
             }
-        } else {
-            // all aces must count as 1 point
-            handValue += aceCount;
         }
 
-        return handValue;
+        return cachedPlayerValue;
     }
 
     @Override
