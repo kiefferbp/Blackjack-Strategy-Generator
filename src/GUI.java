@@ -16,7 +16,7 @@ public class GUI {
         }
 
         // add the soft hands (soft 12-21)
-        for (int i = 4; i <= 21; i++) {
+        for (int i = 12; i <= 21; i++) {
             box.addItem("Soft " + i);
         }
 
@@ -44,7 +44,13 @@ public class GUI {
 
         frame.setMinimumSize(new Dimension(600, 300));
         frame.setLayout(new GridLayout(0, 1));
-        //frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
 
         final JPanel playerPanel = new JPanel(new FlowLayout());
         playerPanel.add(new JLabel("Player hand:"));
