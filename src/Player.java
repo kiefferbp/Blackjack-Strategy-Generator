@@ -45,6 +45,10 @@ public class Player {
             aceCount += 1;
         }
 
+        // reset the cached flags
+        playerValueIsCached = false;
+        playerSoftnessIsCached = false;
+
         return card;
     }
 
@@ -77,10 +81,6 @@ public class Player {
     public Card hit() {
         Card cardObtained = shoe.removeTopCard();
         addCard(cardObtained);
-
-        // reset the cached flags
-        playerValueIsCached = false;
-        playerSoftnessIsCached = false;
 
         return cardObtained;
     }

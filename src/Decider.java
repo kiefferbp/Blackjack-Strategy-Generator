@@ -1,5 +1,6 @@
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -8,10 +9,11 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
+    private static final int STATUS_UPDATE_INTERVAL = 500;
 
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
     private static final ExecutorService executor = Executors.newCachedThreadPool();
-    private AtomicLong currentSimulationNum = new AtomicLong(0);
+    private LongAdder currentSimulationNum = new LongAdder();
 
     private int deckCount;
     private double penetrationValue;
@@ -69,12 +71,12 @@ public class Decider {
 
     public Future<?> addStatusListener(Consumer<Long> listener) {
         return executor.submit(() -> {
-            long lastSimulationNum = currentSimulationNum.get();
+            long lastSimulationNum = currentSimulationNum.longValue();
             while (true) {
-                final long difference = currentSimulationNum.get() - lastSimulationNum;
+                final long difference = (long) Math.floor((1000.0 / STATUS_UPDATE_INTERVAL) * (currentSimulationNum.longValue() - lastSimulationNum));
                 listener.accept(difference);
-                lastSimulationNum = currentSimulationNum.get();
-                Thread.sleep(1000);
+                lastSimulationNum = currentSimulationNum.longValue();
+                Thread.sleep(STATUS_UPDATE_INTERVAL);
             }
         });
     }
@@ -127,7 +129,9 @@ public class Decider {
         while (player.getHandValue() != targetValue || player.handIsSoft() != targetIsSoft) {
             player.hit();
 
-            if (player.getHandValue() > 21) {
+            if (player.getHandValue() > 21 ||
+                    (player.getHandValue() > targetValue && !player.handIsSoft() && !targetIsSoft) ||
+                    ((targetValue - player.getHandValue() + 10) < 1 && player.handIsSoft() && !targetIsSoft)) {
                 resetTask.call();
             }
         }
@@ -257,7 +261,7 @@ public class Decider {
         final Callable<Double> task = () -> {
             double unitsWon = 0;
             for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
-                currentSimulationNum.incrementAndGet();
+                currentSimulationNum.increment();
 
                 // generate a random shoe and player hand under this scenario
                 final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
@@ -324,7 +328,7 @@ public class Decider {
         final Callable<Double> task = () -> {
             double unitsWon = 0;
             for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
-                currentSimulationNum.incrementAndGet();
+                currentSimulationNum.increment();
 
                 // generate a random shoe and player hand under this scenario
                 final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
@@ -361,7 +365,6 @@ public class Decider {
     private final Map<Scenario, Double> expectedSplitMap = new HashMap<>(); // for memoization
     private double getExpectedSplitValue(Scenario scenario, boolean dealerHitsSoft17)
             throws InterruptedException, ExecutionException, Exception {
-
         if (!scenario.isPair) { // can't split
             expectedSplitMap.put(scenario, (double) Integer.MIN_VALUE);
             return Integer.MIN_VALUE;
@@ -370,7 +373,7 @@ public class Decider {
         final Callable<Double> task = () -> {
             double unitsWon = 0;
             for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
-                currentSimulationNum.incrementAndGet();
+                currentSimulationNum.increment();
 
                 final Shoe shoe = new Shoe(deckCount, penetrationValue);
                 final Card playerCard = Card.getCardWithValue(scenario.playerValue / 2);
