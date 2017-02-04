@@ -179,9 +179,7 @@ public class Decider {
      * @param shoe the shoe that the player and dealer are using
      * @return the result of standing (win, lose, push) under this simulation
      */
-    private PlayResult simulateStanding(Player player,
-                                        Player dealer,
-                                        Shoe shoe) {
+    private PlayResult simulateStanding(Player player, Player dealer, Shoe shoe) {
         // if the dealer has an Ace or a 10-valued card, the card at the top of the shoe cannot give him a blackjack
         // if the top card yields a BJ, shuffle the shoe until it no longer does
         final Card firstDealerCard = dealer.getCards().get(0); // the dealer only has one card right now
@@ -218,10 +216,7 @@ public class Decider {
      * @param shoe the shoe that the player and dealer are using
      * @return the result of perfect play (win, lose, push) under this simulation
      */
-    private PlayResult simulateBestPlay(Player player,
-                                        Player dealer,
-                                        Shoe shoe,
-                                        boolean canDoubleDown) throws InterruptedException, ExecutionException, Exception {
+    private PlayResult simulateBestPlay(Player player, Player dealer, Shoe shoe, boolean canDoubleDown) throws Exception {
         final Scenario scenario = buildScenario(player, dealer);
         final Decision bestDecision = computeBestScenarioResult(scenario, canDoubleDown).get(Decision.class);
 
@@ -442,8 +437,12 @@ public class Decider {
         expectedValueMap.put(Decision.HIT, getExpectedHitValue(scenario));
         expectedValueMap.put(Decision.STAND, getExpectedStandValue(scenario));
         expectedValueMap.put(Decision.SPLIT, getExpectedSplitValue(scenario));
-        expectedValueMap.put(Decision.DOUBLE, getExpectedDoubleValue(scenario));
-        if (canDoubleDown) scenarioExpectedValues.put(scenario, expectedValueMap);
+
+        if (canDoubleDown) {
+            expectedValueMap.put(Decision.DOUBLE, getExpectedDoubleValue(scenario));
+        }
+
+        scenarioExpectedValues.put(scenario, expectedValueMap);
 
         return expectedValueMap;
     }
