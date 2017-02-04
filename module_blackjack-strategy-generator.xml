@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="module_blackjack-strategy-generator" default="compile.module.blackjack-strategy-generator">
+  <dirname property="module.blackjack-strategy-generator.basedir" file="${ant.file.module_blackjack-strategy-generator}"/>
+  
+  <property name="module.jdk.home.blackjack-strategy-generator" value="${project.jdk.home}"/>
+  <property name="module.jdk.bin.blackjack-strategy-generator" value="${project.jdk.bin}"/>
+  <property name="module.jdk.classpath.blackjack-strategy-generator" value="${project.jdk.classpath}"/>
+  
+  <property name="compiler.args.blackjack-strategy-generator" value="-encoding UTF-8 -source 8 -target 8 ${compiler.args}"/>
+  
+  <property name="blackjack-strategy-generator.output.dir" value="${module.blackjack-strategy-generator.basedir}/out/production/blackjack-strategy-generator"/>
+  <property name="blackjack-strategy-generator.testoutput.dir" value="${module.blackjack-strategy-generator.basedir}/out/test/blackjack-strategy-generator"/>
+  
+  <path id="blackjack-strategy-generator.module.bootclasspath">
+    <!-- Paths to be included in compilation bootclasspath -->
+  </path>
+  
+  <path id="blackjack-strategy-generator.module.production.classpath">
+    <path refid="${module.jdk.classpath.blackjack-strategy-generator}"/>
+    <pathelement location="${basedir}/lib/hamcrest-core-1.3.jar"/>
+    <pathelement location="${basedir}/lib/junit-4.12.jar"/>
+  </path>
+  
+  <path id="blackjack-strategy-generator.runtime.production.module.classpath">
+    <pathelement location="${blackjack-strategy-generator.output.dir}"/>
+    <pathelement location="${basedir}/lib/hamcrest-core-1.3.jar"/>
+    <pathelement location="${basedir}/lib/junit-4.12.jar"/>
+  </path>
+  
+  <path id="blackjack-strategy-generator.module.classpath">
+    <path refid="${module.jdk.classpath.blackjack-strategy-generator}"/>
+    <pathelement location="${blackjack-strategy-generator.output.dir}"/>
+    <pathelement location="${basedir}/lib/hamcrest-core-1.3.jar"/>
+    <pathelement location="${basedir}/lib/junit-4.12.jar"/>
+    <pathelement location="${basedir}/lib/hamcrest-core-1.3.jar"/>
+    <pathelement location="${basedir}/lib/junit-4.12.jar"/>
+  </path>
+  
+  <path id="blackjack-strategy-generator.runtime.module.classpath">
+    <pathelement location="${blackjack-strategy-generator.testoutput.dir}"/>
+    <pathelement location="${blackjack-strategy-generator.output.dir}"/>
+    <pathelement location="${basedir}/lib/hamcrest-core-1.3.jar"/>
+    <pathelement location="${basedir}/lib/junit-4.12.jar"/>
+    <pathelement location="${basedir}/lib/hamcrest-core-1.3.jar"/>
+    <pathelement location="${basedir}/lib/junit-4.12.jar"/>
+  </path>
+  
+  
+  <patternset id="excluded.from.module.blackjack-strategy-generator">
+    <patternset refid="ignored.files"/>
+  </patternset>
+  
+  <patternset id="excluded.from.compilation.blackjack-strategy-generator">
+    <patternset refid="excluded.from.module.blackjack-strategy-generator"/>
+  </patternset>
+  
+  <path id="blackjack-strategy-generator.module.sourcepath">
+    <dirset dir="${module.blackjack-strategy-generator.basedir}">
+      <include name="src"/>
+    </dirset>
+  </path>
+  
+  
+  <target name="compile.module.blackjack-strategy-generator" depends="compile.module.blackjack-strategy-generator.production,compile.module.blackjack-strategy-generator.tests" description="Compile module blackjack-strategy-generator"/>
+  
+  <target name="compile.module.blackjack-strategy-generator.production" depends="register.custom.compilers" description="Compile module blackjack-strategy-generator; production classes">
+    <mkdir dir="${blackjack-strategy-generator.output.dir}"/>
+    <javac2 destdir="${blackjack-strategy-generator.output.dir}" debug="${compiler.debug}" nowarn="${compiler.generate.no.warnings}" memorymaximumsize="${compiler.max.memory}" fork="true" executable="${module.jdk.bin.blackjack-strategy-generator}/javac">
+      <compilerarg line="${compiler.args.blackjack-strategy-generator}"/>
+      <bootclasspath refid="blackjack-strategy-generator.module.bootclasspath"/>
+      <classpath refid="blackjack-strategy-generator.module.production.classpath"/>
+      <src refid="blackjack-strategy-generator.module.sourcepath"/>
+      <patternset refid="excluded.from.compilation.blackjack-strategy-generator"/>
+    </javac2>
+    
+    <copy todir="${blackjack-strategy-generator.output.dir}">
+      <fileset dir="${module.blackjack-strategy-generator.basedir}/src">
+        <patternset refid="compiler.resources"/>
+        <type type="file"/>
+      </fileset>
+    </copy>
+  </target>
+  
+  <target name="compile.module.blackjack-strategy-generator.tests" depends="register.custom.compilers,compile.module.blackjack-strategy-generator.production" description="compile module blackjack-strategy-generator; test classes" unless="skip.tests"/>
+  
+  <target name="clean.module.blackjack-strategy-generator" description="cleanup module">
+    <delete dir="${blackjack-strategy-generator.output.dir}"/>
+    <delete dir="${blackjack-strategy-generator.testoutput.dir}"/>
+  </target>
+</project>

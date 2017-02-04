@@ -1,3 +1,5 @@
+package main;
+
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -44,7 +46,7 @@ public class Shoe {
     public Card removeCard(Card card) {
         final int currentCount = shoeComposition.get(card);
         if (currentCount == 0) {
-            throw new IllegalStateException("Card does not exist in the shoe");
+            throw new IllegalStateException("main.Card does not exist in the shoe");
         } else {
             shoeComposition.put(card, currentCount - 1);
             cardsInShoe -= 1;
@@ -65,7 +67,7 @@ public class Shoe {
             }
         }
 
-        throw new IllegalStateException("Shoe is empty");
+        throw new IllegalStateException("main.Shoe is empty");
     }
 
     public Card putCardBack(Card card) {

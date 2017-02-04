@@ -1,3 +1,5 @@
+package main;
+
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -48,8 +50,8 @@ public enum Card {
         final Card[] cards = Card.values();
 
         int maxIndex;
-        if (maxValue < 10) { // Card.TWO through Card.NINE
-            maxIndex = maxValue - 1; // cards[1] = Card.TWO, ..., cards[8] = Card.NINE
+        if (maxValue < 10) { // main.Card.TWO through main.Card.NINE
+            maxIndex = maxValue - 1; // cards[1] = main.Card.TWO, ..., cards[8] = main.Card.NINE
         } else {
             maxIndex = 12; // include 10/J/Q/K
         }

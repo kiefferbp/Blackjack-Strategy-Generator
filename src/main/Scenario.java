@@ -1,3 +1,5 @@
+package main;
+
 import java.util.Objects;
 
 /**
@@ -39,10 +41,10 @@ public class Scenario {
         String playerDescription;
         if (isPair) {
             final Card playerCard = Card.getCardWithValue(playerValue / 2);
-            playerDescription = "Player pair of " + playerCard + "s";
+            playerDescription = "main.Player pair of " + playerCard + "s";
         } else {
             final String playerHandType = (isPlayerSoft ? "Soft" : "Hard");
-            playerDescription = "Player " + playerHandType + " " + playerValue;
+            playerDescription = "main.Player " + playerHandType + " " + playerValue;
         }
         result.append(playerDescription);
 
