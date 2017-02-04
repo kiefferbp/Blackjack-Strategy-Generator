@@ -1,6 +1,7 @@
+package main;
+
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
 import java.util.concurrent.Future;
 
 /**
@@ -53,14 +54,14 @@ public class GUI {
         }
 
         final JPanel playerPanel = new JPanel(new FlowLayout());
-        playerPanel.add(new JLabel("Player hand:"));
+        playerPanel.add(new JLabel("main.Player hand:"));
         playerPanel.add(playerBox);
         playerPanel.add(isPairBox);
-        playerPanel.add(new JLabel("Pair?"));
+        playerPanel.add(new JLabel("main.Pair?"));
         frame.add(playerPanel);
 
         final JPanel dealerPanel = new JPanel(new FlowLayout());
-        dealerPanel.add(new JLabel("Dealer's up card:"));
+        dealerPanel.add(new JLabel("main.Dealer's up card:"));
         dealerPanel.add(dealerBox);
         frame.add(dealerPanel);
 

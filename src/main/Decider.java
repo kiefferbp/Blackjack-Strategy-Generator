@@ -1,3 +1,5 @@
+package main;
+
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.LongAdder;
@@ -35,7 +37,7 @@ public class Decider {
      *                         in the shoe are removed.
      * @throws IllegalStateException if the ExecutorService used to generate hands has been shut down
      */
-    Decider(int deckCount, double penetrationValue) {
+    public Decider(int deckCount, double penetrationValue) {
         if (executor.isShutdown()) {
             throw new IllegalStateException("ExecutorService has been shut down already");
         }
@@ -149,7 +151,7 @@ public class Decider {
      * given a player and dealer.
      * @param player the player of the scenario
      * @param dealer the dealer of the scenario
-     * @return a <tt>Scenario</tt> that encapsulates the state of the player and dealer
+     * @return a <tt>main.Scenario</tt> that encapsulates the state of the player and dealer
      */
     private Scenario buildScenario(Player player, Player dealer) {
         final Scenario scenario = new Scenario();
