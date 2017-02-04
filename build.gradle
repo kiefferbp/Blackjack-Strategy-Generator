@@ -11,6 +11,7 @@ sourceSets {
         java {
             srcDir 'src/test'
         }
+        maxHeapSize = "2g"
     }
 }
 
