@@ -21,11 +21,20 @@ public class DeciderTest {
         scenario.isPair = true;
         scenario.dealerCard = Card.ACE;
 
-        final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true);
-        final Decision bestDecision = p.get(Decision.class);
-        final double bestResult = p.get(Double.class);
-
+        Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true);
+        Decision bestDecision = p.get(Decision.class);
+        double bestResult = p.get(Double.class);
         assertTrue("We should split two 8's vs an Ace", bestDecision.equals(Decision.SPLIT));
         assertTrue("The expected value of two 8's vs an Ace should be about -0.372535", approximatelyEqual(bestResult, -0.372535));
+
+        scenario.playerValue = 21;
+        scenario.isPlayerSoft = false;
+        scenario.isPair = false;
+        scenario.dealerCard = Card.ACE;
+        p = d.computeBestScenarioResult(scenario, true);
+        bestDecision = p.get(Decision.class);
+        bestResult = p.get(Double.class);
+        assertTrue("We should stand on a hard 21 vs an Ace", bestDecision.equals(Decision.STAND));
+        assertTrue("The expected value of two 8's vs an Ace should be about 0.922194", approximatelyEqual(bestResult, 0.922194));
     }
 }
