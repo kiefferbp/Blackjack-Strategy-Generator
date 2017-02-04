@@ -96,7 +96,7 @@ public class GUI {
 
                 try {
                     final long startTime = System.nanoTime();
-                    final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, false, true);
+                    final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true);
                     final long endTime = System.nanoTime();
                     status.setText(scenario + " best strategy: " + p.get(Decision.class) + " (" + p.get(Double.class) + ")");
                     System.out.println("Computation time: " + (endTime - startTime) / 1000000000.0 + "s");
