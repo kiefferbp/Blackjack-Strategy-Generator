@@ -1,17 +1,30 @@
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Consumer;
 
 /**
  * Created by Brian on 1/17/2017.
  */
 public class Decider {
     private static final int SIMULATION_COUNT = 1000000;
+    private static final int STATUS_UPDATE_INTERVAL = 500;
 
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
-    private static final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    private static final ExecutorService executor = Executors.newCachedThreadPool();
+    private LongAdder currentSimulationNum = new LongAdder();
 
     private int deckCount;
     private double penetrationValue;
+    private int splitHandLimit = 4;
+    private List<Runnable> statusListeners;
+    private Map<Scenario, Semaphore> hitSemaphoreMap = new HashMap<>();
+    private Map<Scenario, Semaphore> standSemaphoreMap = new HashMap<>();
+    private Map<Scenario, Semaphore> splitSemaphoreMap = new HashMap<>();
+    private Map<Scenario, Semaphore> doubleSemaphoreMap = new HashMap<>();
+
+    // rules
+    private boolean dealerHitsSoft17 = false;
 
     /**
      * Constructor.
@@ -26,8 +39,31 @@ public class Decider {
         if (executor.isShutdown()) {
             throw new IllegalStateException("ExecutorService has been shut down already");
         }
+
         this.deckCount = deckCount;
         this.penetrationValue = penetrationValue;
+        this.statusListeners = new ArrayList<>();
+
+        // init the semaphore maps
+        // some don't make sense and are never used, but let's go with it
+        for (int playerValue = 4; playerValue <= 21; playerValue++) {
+            for (Card dealerCard : Card.values()) {
+                for (boolean isPlayerSoft : new boolean[]{true, false}) {
+                    for (boolean isPair : new boolean[]{true, false}) {
+                        final Scenario scenario = new Scenario();
+                        scenario.playerValue = playerValue;
+                        scenario.dealerCard = dealerCard;
+                        scenario.isPlayerSoft = isPlayerSoft;
+                        scenario.isPair = isPair;
+
+                        hitSemaphoreMap.put(scenario, new Semaphore(1));
+                        standSemaphoreMap.put(scenario, new Semaphore(1));
+                        splitSemaphoreMap.put(scenario, new Semaphore(1));
+                        doubleSemaphoreMap.put(scenario, new Semaphore(1));
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -36,6 +72,18 @@ public class Decider {
      */
     public static void shutDownThreads() {
         executor.shutdownNow();
+    }
+
+    public Future<?> addStatusListener(Consumer<Long> listener) {
+        return executor.submit(() -> {
+            long lastSimulationNum = currentSimulationNum.longValue();
+            while (true) {
+                final long difference = (long) Math.floor((1000.0 / STATUS_UPDATE_INTERVAL) * (currentSimulationNum.longValue() - lastSimulationNum));
+                listener.accept(difference);
+                lastSimulationNum = currentSimulationNum.longValue();
+                Thread.sleep(STATUS_UPDATE_INTERVAL);
+            }
+        });
     }
 
     /**
@@ -49,58 +97,51 @@ public class Decider {
      * @throws InterruptedException if a thread used to generate a hand is interrupted
      * @throws ExecutionException if a thread throws an exception for some reason
      */
-    private Pair<Shoe, Player> getShoePlayerPair(Scenario scenario) throws InterruptedException, ExecutionException {
+    private Pair<Shoe, Player> getShoePlayerPair(Scenario scenario) throws InterruptedException, ExecutionException, Exception {
         final int targetValue = scenario.playerValue;
         final Card dealerCard = scenario.dealerCard;
         final boolean targetIsSoft = scenario.isPlayerSoft;
 
-        final Callable<Pair<Shoe, Player>> task = () -> {
-            final Shoe shoe = new Shoe(deckCount, penetrationValue);
-            final Player player = new Player(shoe);
+        final Shoe shoe = new Shoe(deckCount, penetrationValue);
+        final Player player = new Player(shoe);
 
-            final Callable<Optional<Void>> resetTask = () -> {
-                player.resetHand();
-                shoe.rebuildShoe();
+        final Callable<?> resetTask = () -> {
+            player.resetHand();
+            shoe.rebuildShoe();
 
-                // get the player's first card
-                final Card firstPlayerCard = player.hit();
+            // get the player's first card
+            final Card firstPlayerCard = player.hit();
 
-                // take out the dealer's card from the shoe
-                shoe.removeCard(dealerCard);
+            // take out the dealer's card from the shoe
+            shoe.removeCard(dealerCard);
 
-                // the first two cards cannot be a blackjack
-                Card secondPlayerCard = shoe.removeTopCard();
-                while (isBlackjackPair(firstPlayerCard, secondPlayerCard)) {
-                    shoe.putCardBack(secondPlayerCard);
-                    secondPlayerCard = shoe.removeTopCard();
-                }
-
-                // give the player this second card
-                player.addCard(secondPlayerCard);
-
-                // to appease the Java overlords
-                return Optional.empty();
-            };
-
-            resetTask.call();
-
-            while (player.getHandValue() != targetValue || player.handIsSoft() != targetIsSoft) {
-                player.hit();
-
-                if (player.getHandValue() > 21) {
-                    resetTask.call();
-                }
+            // the first two cards cannot be a blackjack
+            Card secondPlayerCard = shoe.removeTopCard();
+            while (isBlackjackPair(firstPlayerCard, secondPlayerCard)) {
+                shoe.putCardBack(secondPlayerCard);
+                secondPlayerCard = shoe.removeTopCard();
             }
 
-            return new Pair<>(shoe, player);
+            // give the player this second card
+            player.addCard(secondPlayerCard);
+
+            // to appease the Java overlords
+            return Optional.empty();
         };
 
-        final List<Callable<Pair<Shoe, Player>>> taskList = new ArrayList<>();
-        for (int i = 0; i < threadCount; i++) {
-            taskList.add(task);
+        resetTask.call();
+
+        while (player.getHandValue() != targetValue || player.handIsSoft() != targetIsSoft) {
+            player.hit();
+
+            if (player.getHandValue() > 21 ||
+                    (player.getHandValue() > targetValue && !player.handIsSoft() && !targetIsSoft) ||
+                    ((targetValue - player.getHandValue() + 10) < 1 && player.handIsSoft() && !targetIsSoft)) {
+                resetTask.call();
+            }
         }
         
-        return executor.invokeAny(taskList);
+        return new Pair<>(shoe, player);
     }
 
     /**
@@ -136,13 +177,9 @@ public class Decider {
      * @param player the player who is standing on his hand
      * @param dealer the dealer
      * @param shoe the shoe that the player and dealer are using
-     * @param dealerHitsSoft17 <tt>true</tt> if the dealer hits a soft 17, <tt>false</tt> if he stands on a soft 17
      * @return the result of standing (win, lose, push) under this simulation
      */
-    private PlayResult simulateStanding(Player player,
-                                        Player dealer,
-                                        Shoe shoe,
-                                        boolean dealerHitsSoft17) {
+    private PlayResult simulateStanding(Player player, Player dealer, Shoe shoe) {
         // if the dealer has an Ace or a 10-valued card, the card at the top of the shoe cannot give him a blackjack
         // if the top card yields a BJ, shuffle the shoe until it no longer does
         final Card firstDealerCard = dealer.getCards().get(0); // the dealer only has one card right now
@@ -177,15 +214,11 @@ public class Decider {
      * @param player the player
      * @param dealer the dealer
      * @param shoe the shoe that the player and dealer are using
-     * @param dealerHitsSoft17 <tt>true</tt> if the dealer hits a soft 17, <tt>false</tt> if he stands on a soft 17
      * @return the result of perfect play (win, lose, push) under this simulation
      */
-    private PlayResult simulateBestPlay(Player player,
-                                        Player dealer,
-                                        Shoe shoe,
-                                        boolean dealerHitsSoft17) throws InterruptedException, ExecutionException {
+    private PlayResult simulateBestPlay(Player player, Player dealer, Shoe shoe, boolean canDoubleDown) throws Exception {
         final Scenario scenario = buildScenario(player, dealer);
-        final Decision bestDecision = computeBestScenarioResult(scenario, dealerHitsSoft17).get(Decision.class);
+        final Decision bestDecision = computeBestScenarioResult(scenario, canDoubleDown).get(Decision.class);
 
         switch (bestDecision) {
             case HIT:
@@ -194,54 +227,152 @@ public class Decider {
                 if (player.getHandValue() > 21) {
                     return PlayResult.LOSE;
                 } else {
-                    return simulateBestPlay(player, dealer, shoe, dealerHitsSoft17);
+                    return simulateBestPlay(player, dealer, shoe, canDoubleDown);
                 }
             case STAND:
-                return simulateStanding(player, dealer, shoe, dealerHitsSoft17);
+                return simulateStanding(player, dealer, shoe);
             default:
                 return null; // other decisions will come later
         }
 
     }
 
+    private Double getExpectedDecisionValue(Decision decision, Scenario scenario, Map<Scenario, Double> map, Semaphore semaphore) throws Exception {
+        final Callable<Double> task = () -> {
+            double unitsWon = 0;
+            for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
+                currentSimulationNum.increment();
+
+                // generate a random shoe and player hand under this scenario
+                final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
+                final Shoe shoe = shoePlayerPair.get(Shoe.class);
+                final Player player = shoePlayerPair.get(Player.class);
+                final Player dealer = new Player(shoe);
+                final Card dealerCard = scenario.dealerCard;
+                dealer.addCard(dealerCard);
+
+                switch (decision) {
+                    case HIT:
+                        // take a hit
+                        player.hit();
+
+                        if (player.getHandValue() > 21) {
+                            unitsWon -= 1;
+                        } else {
+                            // inductive step: simulate best play on the new hand
+                            final PlayResult bestPlayResult = simulateBestPlay(player, dealer, shoe, false);
+                            unitsWon += bestPlayResult.getWinAmount();
+                        }
+
+                        break;
+                    case STAND:
+                        // play out the dealer
+                        final PlayResult result = simulateStanding(player, dealer, shoe);
+                        unitsWon += result.getWinAmount();
+                        break;
+                    case DOUBLE:
+                        // have the player take one more card and then stand
+                        player.hit();
+
+                        if (player.getHandValue() > 21) {
+                            unitsWon -= 2;
+                        } else {
+                            unitsWon += 2 * simulateStanding(player, dealer, shoe).getWinAmount();
+                        }
+
+                        break;
+                    case SPLIT:
+                        // we need to reset the shoe
+                        shoe.rebuildShoe();
+
+                        // get the correct player card
+                        final Card playerCard = Card.getCardWithValue(scenario.playerValue / 2);
+                        shoe.removeCard(playerCard);
+                        shoe.removeCard(playerCard);
+                        shoe.removeCard(dealerCard);
+
+                        // set up the list of player hands
+                        // note: splitting two X's results in two hands with one X in each of them
+                        final List<Player> playerHands = new ArrayList<>();
+                        final Player playerHand1 = new Player(shoe);
+                        final Player playerHand2 = new Player(shoe);
+                        playerHand1.addCard(playerCard);
+                        playerHand2.addCard(playerCard);
+                        playerHands.add(playerHand1);
+                        playerHands.add(playerHand2);
+
+                        // process the hands, splitting new pairs as neededf
+                        final Stack<Player> handStack = new Stack<>();
+                        handStack.push(playerHand1);
+                        handStack.push(playerHand2);
+
+                        int handCount = 2; // since we already split once to two hands
+                        while (!handStack.isEmpty()) {
+                            final Player playerHand = handStack.pop();
+
+                            // get a second card for this hand
+                            final Card topCard = shoe.removeTopCard();
+
+                            // note: check topCard.getValue() == playerCard.getValue() instead of
+                            // topCard.equals(playerCard) for 10/J/Q/K in particular
+                            if (topCard.getValue() == playerCard.getValue() && handCount < splitHandLimit) {
+                                // split the hand
+                                final Player newPlayerHand = new Player(shoe);
+                                newPlayerHand.addCard(topCard);
+                                playerHands.add(newPlayerHand);
+                                handStack.push(newPlayerHand);
+                                handStack.push(playerHand); // |playerHand| is not done
+                                handCount += 1;
+                            } else {
+                                playerHand.addCard(topCard);
+                            }
+                        }
+
+                        for (Player playerHand : playerHands) {
+                            final Scenario handScenario = buildScenario(playerHand, dealer);
+                            final double handUnitsWon = playerCard.equals(Card.ACE)
+                                    ? getExpectedStandValue(handScenario) // if we split aces, we cannot take more cards
+                                    : computeBestScenarioResult(handScenario, true).get(Double.class);
+                            unitsWon += handUnitsWon;
+                        }
+
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Unknown decision " + decision);
+                }
+            }
+
+            return unitsWon;
+        };
+
+        final List<Callable<Double>> taskList = new ArrayList<>();
+        for (int i = 0; i < threadCount; i++) {
+            taskList.add(task);
+        }
+
+        double totalUnitsWon = 0.0;
+        for (Future<Double> future : executor.invokeAll(taskList)) {
+            totalUnitsWon += future.get();
+        }
+
+        final double expectedWinnings = totalUnitsWon / (threadCount * Math.ceil(SIMULATION_COUNT / threadCount));
+        System.out.println(decision + " result (" + scenario + "): " + expectedWinnings);
+        map.put(scenario, expectedWinnings);
+        semaphore.release();
+        return expectedWinnings;
+    }
+
     private final Map<Scenario, Double> expectedHitMap = new HashMap<>(); // for memoization
-    private double getExpectedHitValue(Scenario scenario, boolean dealerHitsSoft17)
-            throws InterruptedException, ExecutionException {
+    private double getExpectedHitValue(Scenario scenario) throws Exception {
+        final Semaphore hitSemaphore = hitSemaphoreMap.get(scenario);
+        hitSemaphore.acquire();
+
         if (expectedHitMap.get(scenario) != null) {
+            hitSemaphore.release();
             return expectedHitMap.get(scenario);
         }
 
-        // base case: the player is guaranteed to bust if he hits a hard 21
-        if (scenario.playerValue == 21 && !scenario.isPlayerSoft) {
-            expectedHitMap.put(scenario, -1.0);
-            return -1.0;
-        }
-
-        double unitsWon = 0;
-        for (int i = 0; i < SIMULATION_COUNT; i++) {
-            // generate a random shoe and player hand under this scenario
-            final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
-            final Shoe shoe = shoePlayerPair.get(Shoe.class);
-            final Player player = shoePlayerPair.get(Player.class);
-            final Player dealer = new Player(shoe);
-            dealer.addCard(scenario.dealerCard);
-
-            // take a hit
-            player.hit();
-
-            if (player.getHandValue() > 21) {
-                unitsWon -= 1;
-            } else {
-                // inductive step: simulate best play on the new hand
-                final PlayResult bestPlayResult = simulateBestPlay(player, dealer, shoe, dealerHitsSoft17);
-                unitsWon += bestPlayResult.getWinAmount();
-            }
-        }
-
-        final double expectedWinnings = unitsWon / SIMULATION_COUNT;
-        System.out.println("hitting result (" + scenario + "): " + expectedWinnings);
-        expectedHitMap.put(scenario, expectedWinnings);
-        return expectedWinnings;
+        return getExpectedDecisionValue(Decision.HIT, scenario, expectedHitMap, hitSemaphore);
     }
 
 
@@ -252,101 +383,73 @@ public class Decider {
      * and the dealer's up-card).
      *
      * @param scenario the scenario to compute the expected value for
-     * @param dealerHitsSoft17 <tt>true</tt> if the dealer hits a soft 17, <tt>false</tt> if he stands on a soft 17
      * @return a double from -2 to 2 representing the average win amount
      * @throws InterruptedException if a thread used to generate a hand is interrupted
      * @throws ExecutionException if a thread throws an exception for some reason
      */
-    private double getExpectedStandValue(final Scenario scenario, final boolean dealerHitsSoft17)
-            throws InterruptedException, ExecutionException {
+    private double getExpectedStandValue(final Scenario scenario) throws Exception {
+        final Semaphore standSemaphore = standSemaphoreMap.get(scenario);
+        standSemaphore.acquire();
+
         if (expectedStandMap.get(scenario) != null) {
+            standSemaphore.release();
             return expectedStandMap.get(scenario);
         }
 
-        double unitsWon = 0;
-        for (int i = 0; i < SIMULATION_COUNT; i++) {
-            // generate a random shoe and player hand under this scenario
-            final Pair<Shoe, Player> shoePlayerPair = getShoePlayerPair(scenario);
-            final Shoe shoe = shoePlayerPair.get(Shoe.class);
-            final Player player = shoePlayerPair.get(Player.class);
-            final Player dealer = new Player(shoe);
-            dealer.addCard(scenario.dealerCard);
-
-            // play this scenario out
-            final PlayResult result = simulateStanding(player, dealer, shoe, dealerHitsSoft17);
-            unitsWon += result.getWinAmount();
-        }
-
-        final double expectedWinnings = unitsWon / SIMULATION_COUNT;
-        System.out.println("standing result (" + scenario + "): " + expectedWinnings);
-        expectedStandMap.put(scenario, expectedWinnings);
-        return expectedWinnings;
+        return getExpectedDecisionValue(Decision.STAND, scenario, expectedStandMap, standSemaphore);
     }
 
-    private double getExpectedSplitValue(Scenario scenario, boolean dealerHitsSoft17)
-            throws InterruptedException, ExecutionException {
+    private final Map<Scenario, Double> expectedSplitMap = new HashMap<>(); // for memoization
+    private double getExpectedSplitValue(Scenario scenario) throws Exception {
+        final Semaphore splitSemaphore = splitSemaphoreMap.get(scenario);
+        splitSemaphore.acquire();
+
         if (!scenario.isPair) { // can't split
+            expectedSplitMap.put(scenario, (double) Integer.MIN_VALUE);
+            splitSemaphore.release();
             return Integer.MIN_VALUE;
         }
 
-        double unitsWon = 0;
-        for (int i = 0; i < SIMULATION_COUNT; i++) {
-            final Shoe shoe = new Shoe(deckCount, penetrationValue);
-            final Card playerCard = Card.getCardWithValue(scenario.playerValue / 2);
-            final Card dealerCard = scenario.dealerCard;
-            shoe.removeCard(playerCard);
-            shoe.removeCard(playerCard);
-            shoe.removeCard(dealerCard);
+        return getExpectedDecisionValue(Decision.SPLIT, scenario, expectedSplitMap, splitSemaphore);
+    }
 
-            final Player playerHand1 = new Player(shoe);
-            final Player playerHand2 = new Player(shoe);
-            final Player dealer = new Player(shoe);
-            dealer.addCard(dealerCard);
-            playerHand1.addCard(playerCard);
-            playerHand2.addCard(playerCard);
+    private final Map<Scenario, Double> expectedDoubleMap = new HashMap<>(); // for memoization
+    private double getExpectedDoubleValue(Scenario scenario) throws Exception {
+        final Semaphore doubleSemaphore = standSemaphoreMap.get(scenario);
+        doubleSemaphore.acquire();
 
-            // each player hand is required to take a second card
-            playerHand1.hit();
-            playerHand2.hit();
-
-            final Scenario scenarioHand1 = buildScenario(playerHand1, dealer);
-            final Scenario scenarioHand2 = buildScenario(playerHand2, dealer);
-            if (playerCard.equals(Card.ACE)) {
-                // if we split aces, we cannot take more cards
-                final double expectedStandHand1 = getExpectedStandValue(scenarioHand1, dealerHitsSoft17);
-                final double expectedStandHand2 = getExpectedStandValue(scenarioHand2, dealerHitsSoft17);
-                unitsWon += expectedStandHand1 + expectedStandHand2;
-            } else {
-                final double expectedBestHand1 =
-                        computeBestScenarioResult(scenarioHand1, dealerHitsSoft17).get(Double.class);
-                final double expectedBestHand2 =
-                        computeBestScenarioResult(scenarioHand2, dealerHitsSoft17).get(Double.class);
-                unitsWon += expectedBestHand1 + expectedBestHand2;
-            }
+        if (expectedDoubleMap.get(scenario) != null) {
+            doubleSemaphore.release();
+            return expectedDoubleMap.get(scenario);
         }
 
-        return unitsWon / SIMULATION_COUNT;
+        return getExpectedDecisionValue(Decision.DOUBLE, scenario, expectedDoubleMap, doubleSemaphore);
     }
 
     private final Map<Scenario, Map<Decision, Double>> scenarioExpectedValues = new HashMap<>();
-    public Map<Decision, Double> computeExpectedValues(Scenario scenario, boolean dealerHitsSoft17)
-            throws InterruptedException, ExecutionException {
+    public Map<Decision, Double> computeExpectedValues(Scenario scenario, boolean canDoubleDown)
+            throws InterruptedException, ExecutionException, Exception {
         if (scenarioExpectedValues.get(scenario) != null) {
             return scenarioExpectedValues.get(scenario);
         }
 
         final Map<Decision, Double> expectedValueMap = new HashMap<>();
-        expectedValueMap.put(Decision.HIT, getExpectedHitValue(scenario, dealerHitsSoft17));
-        expectedValueMap.put(Decision.STAND, getExpectedStandValue(scenario, dealerHitsSoft17));
-        expectedValueMap.put(Decision.SPLIT, getExpectedSplitValue(scenario, dealerHitsSoft17));
+        expectedValueMap.put(Decision.HIT, getExpectedHitValue(scenario));
+        expectedValueMap.put(Decision.STAND, getExpectedStandValue(scenario));
+        expectedValueMap.put(Decision.SPLIT, getExpectedSplitValue(scenario));
+
+        if (canDoubleDown) {
+            expectedValueMap.put(Decision.DOUBLE, getExpectedDoubleValue(scenario));
+        }
 
         scenarioExpectedValues.put(scenario, expectedValueMap);
+
         return expectedValueMap;
     }
 
-    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean dealerHitsSoft17)
-            throws InterruptedException, ExecutionException {
-        final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario, dealerHitsSoft17);
+    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean canDoubleDown)
+            throws InterruptedException, ExecutionException, Exception {
+        final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario, canDoubleDown);
 
         Decision bestExpectedDecision = null;
         double bestExpectedValue = Integer.MIN_VALUE;
@@ -375,8 +478,8 @@ public class Decider {
         final long startTime = System.nanoTime();
 
         try {
-            final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, false);
-            final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, false);
+            final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, true);
+            final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true);
             System.out.println(scenario + " best strategy: " + p.get(Decision.class) + " (" + p.get(Double.class) + ")");
 
             for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
