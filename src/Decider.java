@@ -17,6 +17,7 @@ public class Decider {
 
     private int deckCount;
     private double penetrationValue;
+    private int splitHandLimit = 4;
     private List<Runnable> statusListeners;
     private Map<Scenario, Semaphore> hitSemaphoreMap = new HashMap<>();
     private Map<Scenario, Semaphore> standSemaphoreMap = new HashMap<>();
@@ -382,30 +383,50 @@ public class Decider {
                 shoe.removeCard(playerCard);
                 shoe.removeCard(dealerCard);
 
-                final Player playerHand1 = new Player(shoe);
-                final Player playerHand2 = new Player(shoe);
                 final Player dealer = new Player(shoe);
                 dealer.addCard(dealerCard);
+
+                final List<Player> playerHands = new ArrayList<>();
+                final Player playerHand1 = new Player(shoe);
+                final Player playerHand2 = new Player(shoe);
                 playerHand1.addCard(playerCard);
                 playerHand2.addCard(playerCard);
+                playerHands.add(playerHand1);
+                playerHands.add(playerHand2);
 
-                // each player hand is required to take a second card
-                playerHand1.hit();
-                playerHand2.hit();
+                // process the hands
+                final Stack<Player> handStack = new Stack<>();
+                handStack.add(playerHand1);
+                handStack.add(playerHand2);
 
-                final Scenario scenarioHand1 = buildScenario(playerHand1, dealer);
-                final Scenario scenarioHand2 = buildScenario(playerHand2, dealer);
-                if (playerCard.equals(Card.ACE)) {
-                    // if we split aces, we cannot take more cards
-                    final double expectedStandHand1 = getExpectedStandValue(scenarioHand1, dealerHitsSoft17);
-                    final double expectedStandHand2 = getExpectedStandValue(scenarioHand2, dealerHitsSoft17);
-                    unitsWon += expectedStandHand1 + expectedStandHand2;
-                } else {
-                    final double expectedBestHand1 =
-                            computeBestScenarioResult(scenarioHand1, dealerHitsSoft17).get(Double.class);
-                    final double expectedBestHand2 =
-                            computeBestScenarioResult(scenarioHand2, dealerHitsSoft17).get(Double.class);
-                    unitsWon += expectedBestHand1 + expectedBestHand2;
+                int handCount = 2; // since we already split once to two hands
+                while (!handStack.isEmpty()) {
+                    final Player playerHand = handStack.pop();
+
+                    // get a second card for this hand
+                    final Card topCard = shoe.removeTopCard();
+
+                    // note: check topCard.getValue() == playerCard.getValue() instead of
+                    // topCard.equals(playerCard) for 10/J/Q/K in particular
+                    if (topCard.getValue() == playerCard.getValue() && handCount < splitHandLimit) {
+                        // split the hand
+                        final Player newPlayerHand = new Player(shoe);
+                        newPlayerHand.addCard(topCard);
+                        playerHands.add(newPlayerHand);
+                        handStack.push(newPlayerHand);
+                        handStack.push(playerHand); // |playerHand| is not done
+                        handCount += 1;
+                    } else {
+                        playerHand.addCard(topCard);
+                    }
+                }
+
+                for (Player playerHand : playerHands) {
+                    final Scenario handScenario = buildScenario(playerHand, dealer);
+                    final double handUnitsWon = playerCard.equals(Card.ACE)
+                            ? getExpectedStandValue(handScenario, dealerHitsSoft17) // if we split aces, we cannot take more cards
+                            : computeBestScenarioResult(handScenario, dealerHitsSoft17).get(Double.class);
+                    unitsWon += handUnitsWon;
                 }
             }
 
