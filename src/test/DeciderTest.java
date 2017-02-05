@@ -2,6 +2,7 @@ package test;
 
 import main.*;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.util.Arrays;
@@ -12,6 +13,7 @@ import java.util.Map;
 /**
  * Created by Brian on 2/4/2017.
  */
+@RunWith(Parameterized.class)
 public class DeciderTest {
     private static final double ERROR_MARGIN = 0.002;
     private static final Decider d = new Decider(400, 1.0);
@@ -39,7 +41,7 @@ public class DeciderTest {
     }
 
     @Parameterized.Parameter
-    public Map<Scenario, Map<Decision, Double>> param;
+    public Map.Entry<Scenario, Map<Decision, Double>> param;
 
     private static boolean approximatelyEqual(double a, double b) {
         return (Math.abs(a - b) < ERROR_MARGIN);
@@ -74,15 +76,13 @@ public class DeciderTest {
 
     @Test
     public void testDecision() throws Exception {
-        for (Map.Entry<Scenario, Map<Decision, Double>> entry : param.entrySet()) {
-            final Scenario scenario = entry.getKey();
-            final Map<Decision, Double> decisionMap = entry.getValue();
-            final Decision bestDecision = maxOverMap(decisionMap).get(Decision.class);
-            final double bestValue = maxOverMap(decisionMap).get(Double.class);
+        final Scenario scenario = param.getKey();
+        final Map<Decision, Double> decisionMap = param.getValue();
+        final Decision bestDecision = maxOverMap(decisionMap).get(Decision.class);
+        final double bestValue = maxOverMap(decisionMap).get(Double.class);
 
-            final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true);
-            assertTrue("We should " + bestDecision + " on " + scenario, bestDecision.equals(p.get(Decision.class)));
-            assertTrue("The expected value of " + scenario + " is about " + bestValue, approximatelyEqual(p.get(Double.class), bestValue));
-        }
+        final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true);
+        assertTrue("We should " + bestDecision + " on " + scenario, bestDecision.equals(p.get(Decision.class)));
+        assertTrue("The expected value of " + scenario + " is about " + bestValue, approximatelyEqual(p.get(Double.class), bestValue));
     }
 }
