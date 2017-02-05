@@ -59,13 +59,13 @@ public class SoftHandTest {
         final Scenario s19v2Scenario = new ScenarioBuilder()
                 .setPlayerValue(19)
                 .setDealerCard(Card.TWO)
-                .setSoftFlag(false)
+                .setSoftFlag(true)
                 .setPairFlag(false)
                 .build();
         final Map<Decision, Double> s19v2Map = new HashMap<>();
-        s19v2Map.put(Decision.STAND, -0.153699);
-        s19v2Map.put(Decision.HIT, 0.333690);
-        s19v2Map.put(Decision.DOUBLE, 0.667380);
+        s19v2Map.put(Decision.STAND, 0.386305);
+        s19v2Map.put(Decision.HIT, 0.123958);
+        s19v2Map.put(Decision.DOUBLE, 0.241855);
         s19v2Map.put(Decision.SPLIT, (double) Integer.MIN_VALUE);
         paramMap.put(s19v2Scenario, s19v2Map);
 
