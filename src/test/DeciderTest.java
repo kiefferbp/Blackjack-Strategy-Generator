@@ -15,8 +15,8 @@ import java.util.Map;
  */
 @RunWith(Parameterized.class)
 public class DeciderTest {
-    private static final double ERROR_MARGIN = 0.002;
-    private static final Decider d = new Decider(400, 1.0);
+    private static final double ERROR_MARGIN = 0.005;
+    private static final Decider d = new Decider(1000, 1.0);
 
     @Parameterized.Parameters
     public static Iterable<?> data() {
