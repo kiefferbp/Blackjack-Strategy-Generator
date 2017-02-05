@@ -37,7 +37,7 @@ public class DeciderTest {
         h21vAMap.put(Decision.SPLIT, (double) Integer.MIN_VALUE);
         paramMap.put(h21vAMapScenario, h21vAMap);
 
-        /*
+
         // hard 16 V 10: standing = -0.540430, hitting = -0.539826, doubling = -1.079653, splitting = Integer.MIN_VALUE
         final Scenario h16v10Scenario = new ScenarioBuilder()
                 .setPlayerValue(16)
@@ -60,11 +60,11 @@ public class DeciderTest {
                 .setPairFlag(false)
                 .build();
         final Map<Decision, Double> h11v6Map = new HashMap<>();
-        h11v6Map.put(Decision.STAND, -0.540430);
-        h11v6Map.put(Decision.HIT, -0.539826);
-        h11v6Map.put(Decision.DOUBLE, -1.079653);
+        h11v6Map.put(Decision.STAND, -0.153699);
+        h11v6Map.put(Decision.HIT, 0.333690);
+        h11v6Map.put(Decision.DOUBLE, 0.667380);
         h11v6Map.put(Decision.SPLIT, (double) Integer.MIN_VALUE);
-        paramMap.put(h11v6Scenario, h11v6Map);*/
+        paramMap.put(h11v6Scenario, h11v6Map);
 
         return paramMap.entrySet();
     }

@@ -467,36 +467,4 @@ public class Decider {
 
         return new Pair<>(bestExpectedDecision, bestExpectedValue);
     }
-
-    public static void main(String[] args) {
-        final Decider d = new Decider(4, 1.0);
-        final Scenario scenario = new Scenario();
-        scenario.playerValue = 16;
-        scenario.isPlayerSoft = false;
-        scenario.isPair = true;
-        scenario.dealerCard = Card.ACE;
-
-        System.out.println("solving " + scenario);
-        final long startTime = System.nanoTime();
-
-        try {
-            final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, true);
-            final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true);
-            System.out.println(scenario + " best strategy: " + p.get(Decision.class) + " (" + p.get(Double.class) + ")");
-
-            for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
-                final Decision entryDecision = entry.getKey();
-                final double entryExpectedValue = entry.getValue();
-
-                System.out.println("Expected value of " + entryDecision + ": " + entryExpectedValue);
-            }
-
-            final long endTime = System.nanoTime();
-            System.out.println("Computation time: " + (endTime - startTime) / 1000000000.0 + "s");
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        } finally {
-            Decider.shutDownThreads();
-        }
-    }
 }

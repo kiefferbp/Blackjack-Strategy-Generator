@@ -8,7 +8,7 @@ public class ScenarioBuilder {
     public Card dealerCard;
     public boolean isPlayerSoft;
     public boolean isPair;
-    
+
     public ScenarioBuilder setPlayerValue(int playerValue) {
         this.playerValue = playerValue;
         return this;
