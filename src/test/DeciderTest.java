@@ -15,8 +15,9 @@ import java.util.Map;
  */
 @RunWith(Parameterized.class)
 public class DeciderTest {
+    private static final int SIMULATION_COUNT = 5000000;
     private static final double ERROR_MARGIN = 0.005;
-    private static final Decider d = new Decider(1000, 1.0);
+    private static final Decider d = new Decider(1000, 1.0, SIMULATION_COUNT);
 
     @Parameterized.Parameters
     public static Iterable<?> data() {

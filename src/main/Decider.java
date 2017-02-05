@@ -9,7 +9,6 @@ import java.util.function.Consumer;
  * Created by Brian on 1/17/2017.
  */
 public class Decider {
-    private static final int SIMULATION_COUNT = 1000000;
     private static final int STATUS_UPDATE_INTERVAL = 500;
 
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
@@ -18,6 +17,7 @@ public class Decider {
 
     private int deckCount;
     private double penetrationValue;
+    private int simulationCount;
     private int splitHandLimit = 4;
     private List<Runnable> statusListeners;
     private Map<Scenario, Semaphore> hitSemaphoreMap = new HashMap<>();
@@ -37,13 +37,14 @@ public class Decider {
      *                         in the shoe are removed.
      * @throws IllegalStateException if the ExecutorService used to generate hands has been shut down
      */
-    public Decider(int deckCount, double penetrationValue) {
+    public Decider(int deckCount, double penetrationValue, int simulationCount) {
         if (executor.isShutdown()) {
             throw new IllegalStateException("ExecutorService has been shut down already");
         }
 
         this.deckCount = deckCount;
         this.penetrationValue = penetrationValue;
+        this.simulationCount = simulationCount;
         this.statusListeners = new ArrayList<>();
 
         // init the semaphore maps
@@ -240,7 +241,7 @@ public class Decider {
     }
 
     /**
-     * Performs at least <tt>SIMULATION_COUNT</tt> simulations of a given <tt>scenario</tt> (an encapsulation of the
+     * Performs at least <tt>simulationCount</tt> simulations of a given <tt>scenario</tt> (an encapsulation of the
      * player's hand total and the dealer's up-card) given that the first decision made is <tt>decision</tt>. Once that
      * decision is made, further moves are made with perfect play (by induction). This method takes a <tt>Semaphore</tt>
      * that is acquired during the computation and released afterwards. It also takes a memoization <tt>Map</tt> that is
@@ -257,7 +258,7 @@ public class Decider {
     private Double getExpectedDecisionValue(Decision decision, Scenario scenario, Map<Scenario, Double> map, Semaphore semaphore) throws Exception {
         final Callable<Double> task = () -> {
             double unitsWon = 0;
-            for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
+            for (int i = 0; i < Math.ceil(simulationCount / threadCount); i++) {
                 currentSimulationNum.increment();
 
                 // generate a random shoe and player hand under this scenario
@@ -373,7 +374,7 @@ public class Decider {
             totalUnitsWon += future.get();
         }
 
-        final double expectedWinnings = totalUnitsWon / (threadCount * Math.ceil(SIMULATION_COUNT / threadCount));
+        final double expectedWinnings = totalUnitsWon / (threadCount * Math.ceil(simulationCount / threadCount));
         System.out.println(decision + " result (" + scenario + "): " + expectedWinnings);
         map.put(scenario, expectedWinnings);
         semaphore.release();

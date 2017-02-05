@@ -8,6 +8,8 @@ import java.util.concurrent.Future;
  * Created by Brian on 1/30/2017.
  */
 public class GUI {
+    private static final int SIMULATION_COUNT = 1000000;
+
     private JComboBox<String> constructPlayerDropdown() {
         final JComboBox<String> box = new JComboBox<>();
 
@@ -70,7 +72,7 @@ public class GUI {
         frame.pack();
         frame.setVisible(true);
 
-        final Decider d = new Decider(400, 1.0);
+        final Decider d = new Decider(400, 1.0, SIMULATION_COUNT);
         solveButton.addActionListener((e) -> {
             new Thread(() -> {
                 // get the info required to build a scenario
