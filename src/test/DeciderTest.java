@@ -3,8 +3,6 @@ package test;
 import main.*;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
-
 /**
  * Created by Brian on 2/4/2017.
  */
@@ -12,8 +10,18 @@ public class DeciderTest {
     private static final double ERROR_MARGIN = 0.002;
     private static final Decider d = new Decider(400, 1.0);
 
-    private boolean approximatelyEqual(double a, double b) {
+    private static boolean approximatelyEqual(double a, double b) {
         return (Math.abs(a - b) < ERROR_MARGIN);
+    }
+
+    private static void assertTrue(String description, boolean bool) {
+        try {
+            org.junit.Assert.assertTrue(bool);
+            System.out.println(description + " - passed");
+        } catch (AssertionError e) {
+            System.err.println(description + " - failed");
+            throw e;
+        }
     }
 
     @Test
