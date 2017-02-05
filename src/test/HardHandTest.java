@@ -14,11 +14,7 @@ import java.util.Map;
  * Created by Brian on 2/4/2017.
  */
 @RunWith(Parameterized.class)
-public class DeciderTest {
-    private static final int SIMULATION_COUNT = 5000000;
-    private static final double ERROR_MARGIN = 0.005;
-    private static final Decider d = new Decider(1000, 1.0, SIMULATION_COUNT);
-
+public class HardHandTest {
     @Parameterized.Parameters
     public static Iterable<?> data() {
         // source: http://wizardofodds.com/games/blackjack/appendix/1/
@@ -66,38 +62,21 @@ public class DeciderTest {
         h11v6Map.put(Decision.SPLIT, (double) Integer.MIN_VALUE);
         paramMap.put(h11v6Scenario, h11v6Map);
 
+        // hard 13 V 3: standing = -0.252250, hitting = -0.291210, doubling = -0.582420, splitting = Integer.MIN_VALUE
+        final Scenario h13v3Scenario = new ScenarioBuilder()
+                .setPlayerValue(13)
+                .setDealerCard(Card.THREE)
+                .setSoftFlag(false)
+                .setPairFlag(false)
+                .build();
+        final Map<Decision, Double> h13v3Map = new HashMap<>();
+        h13v3Map.put(Decision.STAND, -0.252250);
+        h13v3Map.put(Decision.HIT, -0.291210);
+        h13v3Map.put(Decision.DOUBLE, -0.582420);
+        h13v3Map.put(Decision.SPLIT, (double) Integer.MIN_VALUE);
+        paramMap.put(h13v3Scenario, h13v3Map);
+
         return paramMap.entrySet();
-    }
-
-    private static boolean approximatelyEqual(double a, double b) {
-        return (Math.abs(a - b) < ERROR_MARGIN);
-    }
-
-    private static void assertTrue(String description, boolean bool) {
-        try {
-            org.junit.Assert.assertTrue(bool);
-            System.out.println(description + " - passed");
-        } catch (AssertionError e) {
-            System.err.println(description + " - FAILED!");
-            throw e;
-        }
-    }
-
-    private static Pair<Decision, Double> maxOverMap(Map<Decision, Double> map) {
-        Decision bestDecision = null;
-        double bestValue = Integer.MIN_VALUE;
-
-        for (Map.Entry<Decision, Double> entry : map.entrySet()) {
-            final Decision entryDecision = entry.getKey();
-            final double entryValue = entry.getValue();
-
-            if (entryValue > bestValue) {
-                bestDecision = entryDecision;
-                bestValue = entryValue;
-            }
-        }
-
-        return new Pair<>(bestDecision, bestValue);
     }
 
     @Parameterized.Parameter
@@ -105,23 +84,6 @@ public class DeciderTest {
 
     @Test
     public void testDecision() throws Exception {
-        final Scenario scenario = param.getKey();
-        final Map<Decision, Double> decisionMap = param.getValue();
-        final Decision bestDecision = maxOverMap(decisionMap).get(Decision.class);
-        final double bestValue = maxOverMap(decisionMap).get(Double.class);
-
-        final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true);
-        final Map<Decision, Double> scenarioExpectedValues = d.computeExpectedValues(scenario, true);
-
-        for (Map.Entry<Decision, Double> entry : scenarioExpectedValues.entrySet()) {
-            final Decision decision = entry.getKey();
-            final double decisionValue = entry.getValue();
-            final double targetValue = decisionMap.get(decision);
-
-            assertTrue("The expected value of " + decision + " on " + scenario + " is about " + targetValue, approximatelyEqual(decisionValue, targetValue));
-        }
-
-        assertTrue("We should " + bestDecision + " on " + scenario, bestDecision.equals(p.get(Decision.class)));
-        assertTrue("The expected value of " + scenario + " is about " + bestValue, approximatelyEqual(p.get(Double.class), bestValue));
+        TestUtils.testDecision(param);
     }
 }
