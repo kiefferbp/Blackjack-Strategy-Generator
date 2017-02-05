@@ -46,6 +46,6 @@ public class DeciderTest {
         bestDecision = p.get(Decision.class);
         bestResult = p.get(Double.class);
         assertTrue("We should stand on a hard 21 vs an Ace", bestDecision.equals(Decision.STAND));
-        assertTrue("The expected value of two 8's vs an Ace should be about 0.922194", approximatelyEqual(bestResult, 0.922194));
+        assertTrue("The expected value of a hard 21 vs an Ace should be about 0.922194", approximatelyEqual(bestResult, 0.922194));
     }
 }
