@@ -37,7 +37,6 @@ public class DeciderTest {
         h21vAMap.put(Decision.SPLIT, (double) Integer.MIN_VALUE);
         paramMap.put(h21vAMapScenario, h21vAMap);
 
-
         // hard 16 V 10: standing = -0.540430, hitting = -0.539826, doubling = -1.079653, splitting = Integer.MIN_VALUE
         final Scenario h16v10Scenario = new ScenarioBuilder()
                 .setPlayerValue(16)
@@ -69,9 +68,6 @@ public class DeciderTest {
         return paramMap.entrySet();
     }
 
-    @Parameterized.Parameter
-    public Map.Entry<Scenario, Map<Decision, Double>> param;
-
     private static boolean approximatelyEqual(double a, double b) {
         return (Math.abs(a - b) < ERROR_MARGIN);
     }
@@ -102,6 +98,9 @@ public class DeciderTest {
 
         return new Pair<>(bestDecision, bestValue);
     }
+
+    @Parameterized.Parameter
+    public Map.Entry<Scenario, Map<Decision, Double>> param;
 
     @Test
     public void testDecision() throws Exception {
