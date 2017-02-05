@@ -41,10 +41,10 @@ public class Scenario {
         String playerDescription;
         if (isPair) {
             final Card playerCard = Card.getCardWithValue(playerValue / 2);
-            playerDescription = "main.Player pair of " + playerCard + "s";
+            playerDescription = "Player pair of " + playerCard + "s";
         } else {
             final String playerHandType = (isPlayerSoft ? "Soft" : "Hard");
-            playerDescription = "main.Player " + playerHandType + " " + playerValue;
+            playerDescription = "Player " + playerHandType + " " + playerValue;
         }
         result.append(playerDescription);
 
