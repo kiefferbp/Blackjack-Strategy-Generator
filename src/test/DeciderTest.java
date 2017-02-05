@@ -39,7 +39,7 @@ public class DeciderTest {
     }
 
     @Parameterized.Parameter
-    private Map<Scenario, Map<Decision, Double>> param;
+    public Map<Scenario, Map<Decision, Double>> param;
 
     private static boolean approximatelyEqual(double a, double b) {
         return (Math.abs(a - b) < ERROR_MARGIN);
