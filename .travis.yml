@@ -5,4 +5,5 @@ jdk:
 before_install:
 - chmod +x gradlew
 script:
-- ./gradlew check -i
+- ./gradlew test -i --test "test.HardHandTest"
+- ./gradlew test -i --test "test.SoftHandTest"
