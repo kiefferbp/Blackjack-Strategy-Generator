@@ -2,6 +2,7 @@ package test;
 
 import main.*;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.util.HashMap;
@@ -10,6 +11,7 @@ import java.util.Map;
 /**
  * Created by Brian on 2/5/2017.
  */
+@RunWith(Parameterized.class)
 public class SoftHandTest {
     private static final int SIMULATION_COUNT = 5000000;
     private static final Rule r = new RuleBuilder()
