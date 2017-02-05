@@ -12,8 +12,6 @@ import java.util.Map;
  */
 public class TestUtils {
     private static final double ERROR_MARGIN = 0.005;
-    private static final int SIMULATION_COUNT = 5000000;
-    private static final Decider d = new Decider(1000, 1.0, SIMULATION_COUNT);
 
     private TestUtils() {}
 
@@ -48,7 +46,7 @@ public class TestUtils {
         return new Pair<>(bestDecision, bestValue);
     }
 
-    public static void testDecision(Map.Entry<Scenario, Map<Decision, Double>> param) throws Exception {
+    public static void testDecision(Decider d, Map.Entry<Scenario, Map<Decision, Double>> param) throws Exception {
         final Scenario scenario = param.getKey();
         final Map<Decision, Double> decisionMap = param.getValue();
         final Decision bestDecision = maxOverMap(decisionMap).get(Decision.class);

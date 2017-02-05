@@ -15,6 +15,15 @@ import java.util.Map;
  */
 @RunWith(Parameterized.class)
 public class HardHandTest {
+    private static final int SIMULATION_COUNT = 5000000;
+    private static final Rule r = new RuleBuilder()
+            .setDeckCount(1000) // essentially infinite
+            .setPenetrationValue(1.0)
+            .setDealerHitsSoft17(false)
+            .setMaxSplitHands(4)
+            .build();
+    private static final Decider d = new Decider(r, SIMULATION_COUNT);
+
     @Parameterized.Parameters
     public static Iterable<?> data() {
         // source: http://wizardofodds.com/games/blackjack/appendix/1/
@@ -84,6 +93,6 @@ public class HardHandTest {
 
     @Test
     public void testDecision() throws Exception {
-        TestUtils.testDecision(param);
+        TestUtils.testDecision(d, param);
     }
 }

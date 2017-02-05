@@ -15,15 +15,17 @@ public class Decider {
     private static final ExecutorService executor = Executors.newCachedThreadPool();
     private LongAdder currentSimulationNum = new LongAdder();
 
-    private int deckCount;
-    private double penetrationValue;
-    private int simulationCount;
-    private int splitHandLimit = 4;
     private List<Runnable> statusListeners;
     private Map<Scenario, Semaphore> hitSemaphoreMap = new HashMap<>();
     private Map<Scenario, Semaphore> standSemaphoreMap = new HashMap<>();
     private Map<Scenario, Semaphore> splitSemaphoreMap = new HashMap<>();
     private Map<Scenario, Semaphore> doubleSemaphoreMap = new HashMap<>();
+
+    // rule parameters
+    private int deckCount;
+    private double penetrationValue;
+    private int simulationCount;
+    private int splitHandLimit = 4;
 
     // rules
     private boolean dealerHitsSoft17 = false;
@@ -37,13 +39,14 @@ public class Decider {
      *                         in the shoe are removed.
      * @throws IllegalStateException if the ExecutorService used to generate hands has been shut down
      */
-    public Decider(int deckCount, double penetrationValue, int simulationCount) {
+    public Decider(Rule rule, int simulationCount) {
         if (executor.isShutdown()) {
             throw new IllegalStateException("ExecutorService has been shut down already");
         }
 
-        this.deckCount = deckCount;
-        this.penetrationValue = penetrationValue;
+        this.deckCount = rule.getDeckCount();
+        this.penetrationValue = rule.getPenetrationValue();
+        this.splitHandLimit = rule.getMaxSplitHands();
         this.simulationCount = simulationCount;
         this.statusListeners = new ArrayList<>();
 

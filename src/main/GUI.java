@@ -72,7 +72,13 @@ public class GUI {
         frame.pack();
         frame.setVisible(true);
 
-        final Decider d = new Decider(400, 1.0, SIMULATION_COUNT);
+        final Rule r = new RuleBuilder()
+                .setDeckCount(4)
+                .setPenetrationValue(1.0)
+                .setDealerHitsSoft17(false)
+                .setMaxSplitHands(4)
+                .build();
+        final Decider d = new Decider(r, SIMULATION_COUNT);
         solveButton.addActionListener((e) -> {
             new Thread(() -> {
                 // get the info required to build a scenario
