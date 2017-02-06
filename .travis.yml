@@ -4,6 +4,8 @@ jdk:
 - oraclejdk8
 before_install:
 - chmod +x gradlew
-script:
-- ./gradlew test -i --tests "test.HardHandTest"
-- ./gradlew test -i --tests "test.SoftHandTest"
+matrix:
+  include:
+    - env: TEST="test.HardHandTest"
+    - env: TEST="test.SoftHandTest"
+script: ./gradlew test -i --tests $TEST
