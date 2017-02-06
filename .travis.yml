@@ -12,4 +12,6 @@ matrix:
       env: TEST="test.SoftHandTest2"
     - jdk: oraclejdk8
       env: TEST="test.SoftHandTest3"
+    - jdk: oraclejdk8
+      env: TEST="test.SurrenderTest"
 script: ./gradlew test -i --tests $TEST
