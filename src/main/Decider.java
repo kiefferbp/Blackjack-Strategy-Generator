@@ -47,6 +47,8 @@ public class Decider {
 
         this.deckCount = rule.getDeckCount();
         this.penetrationValue = rule.getPenetrationValue();
+        this.dealerHitsSoft17 = rule.dealerHitsSoft17();
+        this.canSurrender = rule.canSurrender();
         this.maxSplitHands = rule.getMaxSplitHands();
         this.simulationCount = simulationCount;
         this.statusListeners = new ArrayList<>();
