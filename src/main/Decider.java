@@ -21,14 +21,15 @@ public class Decider {
     private Map<Scenario, Semaphore> splitSemaphoreMap = new HashMap<>();
     private Map<Scenario, Semaphore> doubleSemaphoreMap = new HashMap<>();
 
-    // rule parameters
+    // rules
     private int deckCount;
     private double penetrationValue;
-    private int simulationCount;
-    private int splitHandLimit = 4;
+    private boolean dealerHitsSoft17;
+    private boolean canSurrender;
+    private int maxSplitHands;
 
-    // rules
-    private boolean dealerHitsSoft17 = false;
+    // other params
+    private int simulationCount;
 
     /**
      * Constructor.
@@ -46,7 +47,7 @@ public class Decider {
 
         this.deckCount = rule.getDeckCount();
         this.penetrationValue = rule.getPenetrationValue();
-        this.splitHandLimit = rule.getMaxSplitHands();
+        this.maxSplitHands = rule.getMaxSplitHands();
         this.simulationCount = simulationCount;
         this.statusListeners = new ArrayList<>();
 
@@ -222,9 +223,9 @@ public class Decider {
      * @param shoe the shoe that the player and dealer are using
      * @return the result of perfect play (win, lose, push) under this simulation
      */
-    private PlayResult simulateBestPlay(Player player, Player dealer, Shoe shoe, boolean canDoubleDown) throws Exception {
+    private PlayResult simulateBestPlay(Player player, Player dealer, Shoe shoe) throws Exception {
         final Scenario scenario = buildScenario(player, dealer);
-        final Decision bestDecision = computeBestScenarioResult(scenario, canDoubleDown).get(Decision.class);
+        final Decision bestDecision = computeBestScenarioResult(scenario, false, false).get(Decision.class);
 
         switch (bestDecision) {
             case HIT:
@@ -233,7 +234,7 @@ public class Decider {
                 if (player.getHandValue() > 21) {
                     return PlayResult.LOSE;
                 } else {
-                    return simulateBestPlay(player, dealer, shoe, canDoubleDown);
+                    return simulateBestPlay(player, dealer, shoe);
                 }
             case STAND:
                 return simulateStanding(player, dealer, shoe);
@@ -281,7 +282,7 @@ public class Decider {
                             unitsWon -= 1;
                         } else {
                             // inductive step: simulate best play on the new hand
-                            final PlayResult bestPlayResult = simulateBestPlay(player, dealer, shoe, false);
+                            final PlayResult bestPlayResult = simulateBestPlay(player, dealer, shoe);
                             unitsWon += bestPlayResult.getWinAmount();
                         }
 
@@ -336,7 +337,7 @@ public class Decider {
 
                             // note: check topCard.getValue() == playerCard.getValue() instead of
                             // topCard.equals(playerCard) for 10/J/Q/K in particular
-                            if (topCard.getValue() == playerCard.getValue() && handCount < splitHandLimit) {
+                            if (topCard.getValue() == playerCard.getValue() && handCount < maxSplitHands) {
                                 // split the hand
                                 final Player newPlayerHand = new Player(shoe);
                                 newPlayerHand.addCard(topCard);
@@ -354,7 +355,7 @@ public class Decider {
                             final Scenario handScenario = buildScenario(playerHand, dealer);
                             final double handUnitsWon = playerCard.equals(Card.ACE)
                                     ? getExpectedStandValue(handScenario) // if we split aces, we cannot take more cards
-                                    : computeBestScenarioResult(handScenario, true).get(Double.class);
+                                    : computeBestScenarioResult(handScenario, true, false).get(Double.class);
                             unitsWon += handUnitsWon;
                         }
 
@@ -484,7 +485,7 @@ public class Decider {
      * @return a map containing the expected values under the given scenario
      * @throws Exception
      */
-    public Map<Decision, Double> computeExpectedValues(Scenario scenario, boolean canDoubleDown) throws Exception {
+    public Map<Decision, Double> computeExpectedValues(Scenario scenario, boolean canDoubleDown, boolean firstMove) throws Exception {
         if (scenarioExpectedValues.get(scenario) != null) {
             return scenarioExpectedValues.get(scenario);
         }
@@ -496,6 +497,10 @@ public class Decider {
 
         if (canDoubleDown) {
             expectedValueMap.put(Decision.DOUBLE, getExpectedDoubleValue(scenario));
+        }
+
+        if (firstMove && canSurrender) {
+            expectedValueMap.put(Decision.SURRENDER, -0.5);
         }
 
         scenarioExpectedValues.put(scenario, expectedValueMap);
@@ -512,8 +517,8 @@ public class Decider {
      * @return a decision-value pair
      * @throws Exception
      */
-    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean canDoubleDown) throws Exception {
-        final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario, canDoubleDown);
+    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean canDoubleDown, boolean firstMove) throws Exception {
+        final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario, canDoubleDown, firstMove);
         Decision bestExpectedDecision = null;
         double bestExpectedValue = Integer.MIN_VALUE;
 

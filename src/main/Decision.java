@@ -7,5 +7,6 @@ public enum Decision {
     HIT,
     STAND,
     DOUBLE,
-    SPLIT; // for now
+    SPLIT,
+    SURRENDER;// for now
 }

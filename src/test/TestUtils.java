@@ -15,11 +15,11 @@ public class TestUtils {
 
     private TestUtils() {}
 
-    private static boolean approximatelyEqual(double a, double b) {
+    public static boolean approximatelyEqual(double a, double b) {
         return (Math.abs(a - b) < ERROR_MARGIN);
     }
 
-    private static void assertTrue(String description, boolean bool) {
+    public static void assertTrue(String description, boolean bool) {
         try {
             org.junit.Assert.assertTrue(bool);
             System.out.println(description + " - passed");
@@ -29,7 +29,7 @@ public class TestUtils {
         }
     }
 
-    private static Pair<Decision, Double> maxOverMap(Map<Decision, Double> map) {
+    public static Pair<Decision, Double> maxOverMap(Map<Decision, Double> map) {
         Decision bestDecision = null;
         double bestValue = Integer.MIN_VALUE;
 

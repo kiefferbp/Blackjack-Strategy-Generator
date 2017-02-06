@@ -7,6 +7,7 @@ public class RuleBuilder {
     private int deckCount = 4;
     private double penetrationValue = 1.0;
     private boolean dealerHitsSoft17 = false;
+    private boolean canSurrender = false;
     private int maxSplitHands = 4;
 
     public RuleBuilder setDeckCount(int deckCount) {
@@ -16,6 +17,11 @@ public class RuleBuilder {
 
     public RuleBuilder setPenetrationValue(double penetrationValue) {
         this.penetrationValue = penetrationValue;
+        return this;
+    }
+
+    public RuleBuilder setCanSurrender(boolean canSurrender) {
+        this.canSurrender = canSurrender;
         return this;
     }
 
@@ -30,6 +36,6 @@ public class RuleBuilder {
     }
 
     public Rule build() {
-        return new Rule(deckCount, penetrationValue, dealerHitsSoft17, maxSplitHands);
+        return new Rule(deckCount, penetrationValue, dealerHitsSoft17, canSurrender, maxSplitHands);
     }
 }

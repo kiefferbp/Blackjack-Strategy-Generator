@@ -18,6 +18,7 @@ public class SoftHandTest3 {
             .setDeckCount(1000) // essentially infinite
             .setPenetrationValue(1.0)
             .setDealerHitsSoft17(false)
+            .setCanSurrender(false)
             .setMaxSplitHands(4)
             .build();
     private static final Decider d = new Decider(r, SIMULATION_COUNT);
