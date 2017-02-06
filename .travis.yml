@@ -7,5 +7,9 @@ matrix:
     - jdk: oraclejdk8
       env: TEST="test.HardHandTest"
     - jdk: oraclejdk8
-      env: TEST="test.SoftHandTest"
+      env: TEST="test.SoftHandTest1"
+    - jdk: oraclejdk8
+      env: TEST="test.SoftHandTest2"
+    - jdk: oraclejdk8
+      env: TEST="test.SoftHandTest3"
 script: ./gradlew test -i --tests $TEST
