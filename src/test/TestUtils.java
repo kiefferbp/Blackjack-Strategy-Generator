@@ -55,13 +55,15 @@ public class TestUtils {
         final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true, true);
         final Map<Decision, Double> scenarioExpectedValues = d.computeExpectedValues(scenario);
 
-        // since param doesn't include the obvious surrender = -0.5 value
-        decisionMap.put(Decision.SURRENDER, -0.5);
-
         for (Map.Entry<Decision, Double> entry : scenarioExpectedValues.entrySet()) {
             final Decision decision = entry.getKey();
             final double decisionValue = entry.getValue();
             final double targetValue = decisionMap.get(decision);
+
+            // we don't need to check this
+            if (decision.equals(Decision.SURRENDER)) {
+                continue;
+            }
 
             assertTrue("The expected value of " + decision + " on " + scenario + " is about " + targetValue, approximatelyEqual(decisionValue, targetValue));
         }
