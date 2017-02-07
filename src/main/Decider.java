@@ -530,7 +530,7 @@ public class Decider {
             final double entryExpectedValue = entry.getValue();
 
             if ((!canDoubleDown && entryDecision.equals(Decision.DOUBLE)) ||
-                    (!firstMove && entryDecision.equals(Decision.SURRENDER))) {
+                    ((!canSurrender || !firstMove) && entryDecision.equals(Decision.SURRENDER))) {
                 continue;
             }
 
