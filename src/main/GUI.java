@@ -73,7 +73,7 @@ public class GUI {
         frame.setVisible(true);
 
         final Rule r = new RuleBuilder()
-                .setDeckCount(4)
+                .setDeckCount(1000)
                 .setPenetrationValue(1.0)
                 .setDealerHitsSoft17(false)
                 .setCanSurrender(false)

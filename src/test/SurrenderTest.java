@@ -17,7 +17,7 @@ import static test.TestUtils.maxOverMap;
  */
 @RunWith(Parameterized.class)
 public class SurrenderTest {
-    private static final int SIMULATION_COUNT = 5000000;
+    private static final int SIMULATION_COUNT = 1000000;
     private static final Rule r = new RuleBuilder()
             .setDeckCount(1000) // essentially infinite
             .setPenetrationValue(1.0)

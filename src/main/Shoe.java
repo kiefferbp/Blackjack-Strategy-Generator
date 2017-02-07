@@ -46,7 +46,7 @@ public class Shoe {
     public Card removeCard(Card card) {
         final int currentCount = shoeComposition.get(card);
         if (currentCount == 0) {
-            throw new IllegalStateException("main.Card does not exist in the shoe");
+            throw new IllegalStateException("Card does not exist in the shoe");
         } else {
             shoeComposition.put(card, currentCount - 1);
             cardsInShoe -= 1;
@@ -67,7 +67,33 @@ public class Shoe {
             }
         }
 
-        throw new IllegalStateException("main.Shoe is empty");
+        throw new IllegalStateException("Shoe is empty");
+    }
+
+    public Card removeCardWithMaxValue(int maxValue) {
+        final List<Card> cardsWithinRange = new ArrayList<>();
+        int cardCountWithinRange = 0;
+
+        for (Card card : Card.values()) {
+            if (card.getValue() <= maxValue || card.equals(Card.ACE)) {
+                cardsWithinRange.add(card);
+                cardCountWithinRange += shoeComposition.get(card);
+            }
+        }
+
+        // continue in a similar fashion to removeTopCard()
+        final int cumulativeTarget = ThreadLocalRandom.current().nextInt(1, cardCountWithinRange + 1);
+        int currentCumulative = 0;
+        for (Card card : cardsWithinRange) {
+            final int cardCount = shoeComposition.get(card);
+            currentCumulative += cardCount;
+
+            if (currentCumulative >= cumulativeTarget) {
+                return removeCard(card);
+            }
+        }
+
+        throw new IllegalStateException("Shoe does not contain card within range");
     }
 
     public Card putCardBack(Card card) {
