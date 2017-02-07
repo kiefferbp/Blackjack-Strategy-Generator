@@ -22,7 +22,9 @@ public class SplittingEights {
     @Test
     public void testSplittingEights() throws Exception {
         try {
-            for (Card dealerCard : Card.values()) {
+            // iterating through Card.values() will consider 10/J/Q/K as four separate cases --- not necessary
+            for (int dealerCardValue = Card.TWO.getValue(); dealerCardValue <= Card.ACE.getValue(); dealerCardValue++) {
+                final Card dealerCard = Card.getCardWithValue(dealerCardValue);
                 final Scenario p8svDealerCardScenario = new ScenarioBuilder()
                         .setPlayerValue(16)
                         .setDealerCard(dealerCard)
