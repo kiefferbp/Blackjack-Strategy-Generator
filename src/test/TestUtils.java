@@ -58,13 +58,13 @@ public class TestUtils {
         for (Map.Entry<Decision, Double> entry : scenarioExpectedValues.entrySet()) {
             final Decision decision = entry.getKey();
             final double decisionValue = entry.getValue();
-            final double targetValue = decisionMap.get(decision);
 
             // we don't need to check this
             if (decision.equals(Decision.SURRENDER)) {
                 continue;
             }
 
+            final double targetValue = decisionMap.get(decision);
             assertTrue("The expected value of " + decision + " on " + scenario + " is about " + targetValue, approximatelyEqual(decisionValue, targetValue));
         }
 
