@@ -15,7 +15,7 @@ import java.util.Map;
  */
 @RunWith(Parameterized.class)
 public class HardHandTest {
-    private static final int SIMULATION_COUNT = 5000000;
+    private static final int SIMULATION_COUNT = 1000000;
     private static final Rule r = new RuleBuilder()
             .setDeckCount(1000) // essentially infinite
             .setPenetrationValue(1.0)
@@ -43,20 +43,6 @@ public class HardHandTest {
         h21vAMap.put(Decision.DOUBLE, -2.0);
         h21vAMap.put(Decision.SPLIT, (double) Integer.MIN_VALUE);
         paramMap.put(h21vAMapScenario, h21vAMap);
-
-        // hard 16 V 10: standing = -0.540430, hitting = -0.539826, doubling = -1.079653, splitting = Integer.MIN_VALUE
-        final Scenario h16v10Scenario = new ScenarioBuilder()
-                .setPlayerValue(16)
-                .setDealerCard(Card.TEN)
-                .setSoftFlag(false)
-                .setPairFlag(false)
-                .build();
-        final Map<Decision, Double> h16v10Map = new HashMap<>();
-        h16v10Map.put(Decision.STAND, -0.540430);
-        h16v10Map.put(Decision.HIT, -0.539826);
-        h16v10Map.put(Decision.DOUBLE, -1.079653);
-        h16v10Map.put(Decision.SPLIT, (double) Integer.MIN_VALUE);
-        paramMap.put(h16v10Scenario, h16v10Map);
 
         // hard 11 V 6: standing = -0.153699, hitting = 0.333690, doubling = 0.667380, splitting = Integer.MIN_VALUE
         final Scenario h11v6Scenario = new ScenarioBuilder()

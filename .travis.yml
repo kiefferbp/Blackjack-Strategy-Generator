@@ -7,11 +7,11 @@ matrix:
     - jdk: oraclejdk8
       env: TEST="test.HardHandTest"
     - jdk: oraclejdk8
-      env: TEST="test.SoftHandTest1"
-    - jdk: oraclejdk8
-      env: TEST="test.SoftHandTest2"
-    - jdk: oraclejdk8
-      env: TEST="test.SoftHandTest3"
+      env: TEST="test.SoftHandTest"
     - jdk: oraclejdk8
       env: TEST="test.SurrenderTest"
+    - jdk: oraclejdk8
+      env: TEST="test.H16vTNSTest"
+    - jdk: oraclejdk8
+      env: TEST="test.SplittingEights"
 script: ./gradlew test -i --tests $TEST
