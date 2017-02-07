@@ -75,7 +75,8 @@ public class GUI {
         final Rule r = new RuleBuilder()
                 .setDeckCount(4)
                 .setPenetrationValue(1.0)
-                .setDealerHitsSoft17(false)
+                .setDealerHitsSoft17(true)
+                .setCanSurrender(true)
                 .setMaxSplitHands(4)
                 .build();
         final Decider d = new Decider(r, SIMULATION_COUNT);

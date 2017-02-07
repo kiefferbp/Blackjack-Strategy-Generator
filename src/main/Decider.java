@@ -487,7 +487,7 @@ public class Decider {
      * @return a map containing the expected values under the given scenario
      * @throws Exception
      */
-    public Map<Decision, Double> computeExpectedValues(Scenario scenario, boolean canDoubleDown, boolean firstMove) throws Exception {
+    public Map<Decision, Double> computeExpectedValues(Scenario scenario) throws Exception {
         if (scenarioExpectedValues.get(scenario) != null) {
             return scenarioExpectedValues.get(scenario);
         }
@@ -496,14 +496,15 @@ public class Decider {
         expectedValueMap.put(Decision.HIT, getExpectedHitValue(scenario));
         expectedValueMap.put(Decision.STAND, getExpectedStandValue(scenario));
         expectedValueMap.put(Decision.SPLIT, getExpectedSplitValue(scenario));
-
-        if (canDoubleDown) {
+        expectedValueMap.put(Decision.DOUBLE, getExpectedDoubleValue(scenario));
+        expectedValueMap.put(Decision.SURRENDER, -0.5);
+        /*if (canDoubleDown) {
             expectedValueMap.put(Decision.DOUBLE, getExpectedDoubleValue(scenario));
         }
 
         if (firstMove && canSurrender) {
             expectedValueMap.put(Decision.SURRENDER, -0.5);
-        }
+        }*/
 
         scenarioExpectedValues.put(scenario, expectedValueMap);
 
@@ -520,13 +521,18 @@ public class Decider {
      * @throws Exception
      */
     public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean canDoubleDown, boolean firstMove) throws Exception {
-        final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario, canDoubleDown, firstMove);
+        final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario);
         Decision bestExpectedDecision = null;
         double bestExpectedValue = Integer.MIN_VALUE;
 
         for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
             final Decision entryDecision = entry.getKey();
             final double entryExpectedValue = entry.getValue();
+
+            if ((!canDoubleDown && entryDecision.equals(Decision.DOUBLE)) ||
+                    (!firstMove && entryDecision.equals(Decision.SURRENDER))) {
+                continue;
+            }
 
             if (entryExpectedValue > bestExpectedValue) {
                 bestExpectedDecision = entryDecision;
