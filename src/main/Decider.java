@@ -118,21 +118,10 @@ public class Decider {
             player.resetHand();
             shoe.rebuildShoe();
 
-            // get the player's first card
-            final Card firstPlayerCard = player.hit();
-
-            // take out the dealer's card from the shoe
-            shoe.removeCard(dealerCard);
-
-            // the first two cards cannot be a blackjack
-            Card secondPlayerCard = shoe.removeTopCard();
-            while (isBlackjackPair(firstPlayerCard, secondPlayerCard)) {
-                shoe.putCardBack(secondPlayerCard);
-                secondPlayerCard = shoe.removeTopCard();
+            if (targetIsSoft) {
+                player.addCard(Card.ACE);
+                shoe.removeCard(Card.ACE);
             }
-
-            // give the player this second card
-            player.addCard(secondPlayerCard);
 
             // to appease the Java overlords
             return Optional.empty();
@@ -152,9 +141,7 @@ public class Decider {
             // (ii) If |isCurrentlySoft| is true and |targetIsSoft| is false, we can take any card that
             // results in either another soft hand or one that tips the new value <= |targetValue|. (see the if statement)
             Card randomCard = null;
-            if ((targetValue < 11 && targetValue == currentHandValue + 1) || // scenario (i)
-                    (currentHandValue > targetValue && !isCurrentlySoft && !targetIsSoft) || // first two cards overshot target
-                    (targetValue <= 11 && currentHandValue > targetValue && isCurrentlySoft && !targetIsSoft)) { // scenario (i): impossible to build
+            if (targetValue < 11 && targetValue == currentHandValue + 1) { // scenario (i): impossible to build
                 // start over
                 resetTask.call();
                 continue;
