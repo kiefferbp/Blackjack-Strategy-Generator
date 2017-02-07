@@ -9,16 +9,12 @@ import java.util.function.Consumer;
  * Created by Brian on 1/17/2017.
  */
 public class Decider {
-    private static final int SIMULATION_COUNT = 1000000;
     private static final int STATUS_UPDATE_INTERVAL = 500;
 
     private static final int threadCount = Runtime.getRuntime().availableProcessors();
     private static final ExecutorService executor = Executors.newCachedThreadPool();
     private LongAdder currentSimulationNum = new LongAdder();
 
-    private int deckCount;
-    private double penetrationValue;
-    private int splitHandLimit = 4;
     private List<Runnable> statusListeners;
     private Map<Scenario, Semaphore> hitSemaphoreMap = new HashMap<>();
     private Map<Scenario, Semaphore> standSemaphoreMap = new HashMap<>();
@@ -26,7 +22,14 @@ public class Decider {
     private Map<Scenario, Semaphore> doubleSemaphoreMap = new HashMap<>();
 
     // rules
-    private boolean dealerHitsSoft17 = false;
+    private int deckCount;
+    private double penetrationValue;
+    private boolean dealerHitsSoft17;
+    private boolean canSurrender;
+    private int maxSplitHands;
+
+    // other params
+    private int simulationCount;
 
     /**
      * Constructor.
@@ -37,13 +40,17 @@ public class Decider {
      *                         in the shoe are removed.
      * @throws IllegalStateException if the ExecutorService used to generate hands has been shut down
      */
-    public Decider(int deckCount, double penetrationValue) {
+    public Decider(Rule rule, int simulationCount) {
         if (executor.isShutdown()) {
             throw new IllegalStateException("ExecutorService has been shut down already");
         }
 
-        this.deckCount = deckCount;
-        this.penetrationValue = penetrationValue;
+        this.deckCount = rule.getDeckCount();
+        this.penetrationValue = rule.getPenetrationValue();
+        this.dealerHitsSoft17 = rule.dealerHitsSoft17();
+        this.canSurrender = rule.canSurrender();
+        this.maxSplitHands = rule.getMaxSplitHands();
+        this.simulationCount = simulationCount;
         this.statusListeners = new ArrayList<>();
 
         // init the semaphore maps
@@ -151,7 +158,7 @@ public class Decider {
      * given a player and dealer.
      * @param player the player of the scenario
      * @param dealer the dealer of the scenario
-     * @return a <tt>main.Scenario</tt> that encapsulates the state of the player and dealer
+     * @return a <tt>Scenario</tt> that encapsulates the state of the player and dealer
      */
     private Scenario buildScenario(Player player, Player dealer) {
         final Scenario scenario = new Scenario();
@@ -218,9 +225,9 @@ public class Decider {
      * @param shoe the shoe that the player and dealer are using
      * @return the result of perfect play (win, lose, push) under this simulation
      */
-    private PlayResult simulateBestPlay(Player player, Player dealer, Shoe shoe, boolean canDoubleDown) throws Exception {
+    private PlayResult simulateBestPlay(Player player, Player dealer, Shoe shoe) throws Exception {
         final Scenario scenario = buildScenario(player, dealer);
-        final Decision bestDecision = computeBestScenarioResult(scenario, canDoubleDown).get(Decision.class);
+        final Decision bestDecision = computeBestScenarioResult(scenario, false, false).get(Decision.class);
 
         switch (bestDecision) {
             case HIT:
@@ -229,7 +236,7 @@ public class Decider {
                 if (player.getHandValue() > 21) {
                     return PlayResult.LOSE;
                 } else {
-                    return simulateBestPlay(player, dealer, shoe, canDoubleDown);
+                    return simulateBestPlay(player, dealer, shoe);
                 }
             case STAND:
                 return simulateStanding(player, dealer, shoe);
@@ -239,10 +246,25 @@ public class Decider {
 
     }
 
+    /**
+     * Performs at least <tt>simulationCount</tt> simulations of a given <tt>scenario</tt> (an encapsulation of the
+     * player's hand total and the dealer's up-card) given that the first decision made is <tt>decision</tt>. Once that
+     * decision is made, further moves are made with perfect play (by induction). This method takes a <tt>Semaphore</tt>
+     * that is acquired during the computation and released afterwards. It also takes a memoization <tt>Map</tt> that is
+     * updated with the result.
+     * @param decision the player's initial decision to make with his hand
+     * @param scenario the initial scenario (an encapsulation of the player's hand total
+     * and the dealer's up-card)
+     * @param map the map to put the computed result in
+     * @param semaphore the semaphore to acquire during the computation
+     * @return the expected value of a given scenario given that the first decision made is <tt>decision</tt> and
+     * perfect play follows.
+     * @throws Exception
+     */
     private Double getExpectedDecisionValue(Decision decision, Scenario scenario, Map<Scenario, Double> map, Semaphore semaphore) throws Exception {
         final Callable<Double> task = () -> {
             double unitsWon = 0;
-            for (int i = 0; i < Math.ceil(SIMULATION_COUNT / threadCount); i++) {
+            for (int i = 0; i < Math.ceil(simulationCount / threadCount); i++) {
                 currentSimulationNum.increment();
 
                 // generate a random shoe and player hand under this scenario
@@ -262,7 +284,7 @@ public class Decider {
                             unitsWon -= 1;
                         } else {
                             // inductive step: simulate best play on the new hand
-                            final PlayResult bestPlayResult = simulateBestPlay(player, dealer, shoe, false);
+                            final PlayResult bestPlayResult = simulateBestPlay(player, dealer, shoe);
                             unitsWon += bestPlayResult.getWinAmount();
                         }
 
@@ -303,7 +325,7 @@ public class Decider {
                         playerHands.add(playerHand1);
                         playerHands.add(playerHand2);
 
-                        // process the hands, splitting new pairs as neededf
+                        // process the hands, splitting new pairs as needed
                         final Stack<Player> handStack = new Stack<>();
                         handStack.push(playerHand1);
                         handStack.push(playerHand2);
@@ -317,24 +339,25 @@ public class Decider {
 
                             // note: check topCard.getValue() == playerCard.getValue() instead of
                             // topCard.equals(playerCard) for 10/J/Q/K in particular
-                            if (topCard.getValue() == playerCard.getValue() && handCount < splitHandLimit) {
+                            if (topCard.getValue() == playerCard.getValue() && handCount < maxSplitHands) {
                                 // split the hand
                                 final Player newPlayerHand = new Player(shoe);
                                 newPlayerHand.addCard(topCard);
                                 playerHands.add(newPlayerHand);
                                 handStack.push(newPlayerHand);
-                                handStack.push(playerHand); // |playerHand| is not done
+                                handStack.push(playerHand); // we are not done processing |playerHand|
                                 handCount += 1;
                             } else {
                                 playerHand.addCard(topCard);
                             }
                         }
 
+                        // play out the hands
                         for (Player playerHand : playerHands) {
                             final Scenario handScenario = buildScenario(playerHand, dealer);
                             final double handUnitsWon = playerCard.equals(Card.ACE)
                                     ? getExpectedStandValue(handScenario) // if we split aces, we cannot take more cards
-                                    : computeBestScenarioResult(handScenario, true).get(Double.class);
+                                    : computeBestScenarioResult(handScenario, true, false).get(Double.class);
                             unitsWon += handUnitsWon;
                         }
 
@@ -357,7 +380,7 @@ public class Decider {
             totalUnitsWon += future.get();
         }
 
-        final double expectedWinnings = totalUnitsWon / (threadCount * Math.ceil(SIMULATION_COUNT / threadCount));
+        final double expectedWinnings = totalUnitsWon / (threadCount * Math.ceil(simulationCount / threadCount));
         System.out.println(decision + " result (" + scenario + "): " + expectedWinnings);
         map.put(scenario, expectedWinnings);
         semaphore.release();
@@ -365,6 +388,14 @@ public class Decider {
     }
 
     private final Map<Scenario, Double> expectedHitMap = new HashMap<>(); // for memoization
+
+    /**
+     * Computes the expected value under a given scenario (an encapsulation of the player's hand total
+     * and the dealer's up-card) given that the first is to hit. All further moves are made with perfect play.
+     * @param scenario the scenario to compute the expected value for
+     * @return a double from -1 to 1 representing the average win amount
+     * @throws Exception
+     */
     private double getExpectedHitValue(Scenario scenario) throws Exception {
         final Semaphore hitSemaphore = hitSemaphoreMap.get(scenario);
         hitSemaphore.acquire();
@@ -386,8 +417,7 @@ public class Decider {
      *
      * @param scenario the scenario to compute the expected value for
      * @return a double from -2 to 2 representing the average win amount
-     * @throws InterruptedException if a thread used to generate a hand is interrupted
-     * @throws ExecutionException if a thread throws an exception for some reason
+     * @throws Exception
      */
     private double getExpectedStandValue(final Scenario scenario) throws Exception {
         final Semaphore standSemaphore = standSemaphoreMap.get(scenario);
@@ -402,6 +432,15 @@ public class Decider {
     }
 
     private final Map<Scenario, Double> expectedSplitMap = new HashMap<>(); // for memoization
+
+    /**
+     * Computes the expected value of splitting under a given scenario (an encapsulation of the player's hand total
+     * and the dealer's up-card).
+     *
+     * @param scenario the scenario to compute the expected value for
+     * @return a double from -2 to 2 representing the average win amount
+     * @throws Exception
+     */
     private double getExpectedSplitValue(Scenario scenario) throws Exception {
         final Semaphore splitSemaphore = splitSemaphoreMap.get(scenario);
         splitSemaphore.acquire();
@@ -416,6 +455,15 @@ public class Decider {
     }
 
     private final Map<Scenario, Double> expectedDoubleMap = new HashMap<>(); // for memoization
+
+    /**
+     * Computes the expected value of doubling down under a given scenario (an encapsulation of the player's hand total
+     * and the dealer's up-card).
+     *
+     * @param scenario the scenario to compute the expected value for
+     * @return a double from -2 to 2 representing the average win amount
+     * @throws Exception
+     */
     private double getExpectedDoubleValue(Scenario scenario) throws Exception {
         final Semaphore doubleSemaphore = standSemaphoreMap.get(scenario);
         doubleSemaphore.acquire();
@@ -429,8 +477,17 @@ public class Decider {
     }
 
     private final Map<Scenario, Map<Decision, Double>> scenarioExpectedValues = new HashMap<>();
-    public Map<Decision, Double> computeExpectedValues(Scenario scenario, boolean canDoubleDown)
-            throws InterruptedException, ExecutionException, Exception {
+
+    /**
+     * Computes the expected value of hitting, standing, doubling down, and splitting under a given scenario (an
+     * encapsulation of the player's hand total and the dealer's up-card).
+     * @param scenario the scenario to compute the expected values for
+     * @param canDoubleDown whether the player has the right to double down. A player loses this right after taking a
+     *                      third card and, under some casino rules, after splitting.
+     * @return a map containing the expected values under the given scenario
+     * @throws Exception
+     */
+    public Map<Decision, Double> computeExpectedValues(Scenario scenario) throws Exception {
         if (scenarioExpectedValues.get(scenario) != null) {
             return scenarioExpectedValues.get(scenario);
         }
@@ -439,25 +496,43 @@ public class Decider {
         expectedValueMap.put(Decision.HIT, getExpectedHitValue(scenario));
         expectedValueMap.put(Decision.STAND, getExpectedStandValue(scenario));
         expectedValueMap.put(Decision.SPLIT, getExpectedSplitValue(scenario));
-
-        if (canDoubleDown) {
+        expectedValueMap.put(Decision.DOUBLE, getExpectedDoubleValue(scenario));
+        expectedValueMap.put(Decision.SURRENDER, -0.5);
+        /*if (canDoubleDown) {
             expectedValueMap.put(Decision.DOUBLE, getExpectedDoubleValue(scenario));
         }
+
+        if (firstMove && canSurrender) {
+            expectedValueMap.put(Decision.SURRENDER, -0.5);
+        }*/
 
         scenarioExpectedValues.put(scenario, expectedValueMap);
 
         return expectedValueMap;
     }
 
-    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean canDoubleDown)
-            throws InterruptedException, ExecutionException, Exception {
-        final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario, canDoubleDown);
-
+    /**
+     * Computes the best decision to make under a given scenario (an encapsulation of the player's hand total and the
+     * dealer's up-card). The result is returned as a decision-value pair.
+     * @param scenario the scenario to compute the best play for
+     * @param canDoubleDown whether the player has the right to double down. A player loses this right after taking a
+     *                      third card and, under some casino rules, after splitting.
+     * @return a decision-value pair
+     * @throws Exception
+     */
+    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean canDoubleDown, boolean firstMove) throws Exception {
+        final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario);
         Decision bestExpectedDecision = null;
         double bestExpectedValue = Integer.MIN_VALUE;
+
         for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
             final Decision entryDecision = entry.getKey();
             final double entryExpectedValue = entry.getValue();
+
+            if ((!canDoubleDown && entryDecision.equals(Decision.DOUBLE)) ||
+                    ((!canSurrender || !firstMove) && entryDecision.equals(Decision.SURRENDER))) {
+                continue;
+            }
 
             if (entryExpectedValue > bestExpectedValue) {
                 bestExpectedDecision = entryDecision;
@@ -466,37 +541,5 @@ public class Decider {
         }
 
         return new Pair<>(bestExpectedDecision, bestExpectedValue);
-    }
-
-    public static void main(String[] args) {
-        final Decider d = new Decider(4, 1.0);
-        final Scenario scenario = new Scenario();
-        scenario.playerValue = 16;
-        scenario.isPlayerSoft = false;
-        scenario.isPair = true;
-        scenario.dealerCard = Card.ACE;
-
-        System.out.println("solving " + scenario);
-        final long startTime = System.nanoTime();
-
-        try {
-            final Map<Decision, Double> expectedValueMap = d.computeExpectedValues(scenario, true);
-            final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true);
-            System.out.println(scenario + " best strategy: " + p.get(Decision.class) + " (" + p.get(Double.class) + ")");
-
-            for (Map.Entry<Decision, Double> entry : expectedValueMap.entrySet()) {
-                final Decision entryDecision = entry.getKey();
-                final double entryExpectedValue = entry.getValue();
-
-                System.out.println("Expected value of " + entryDecision + ": " + entryExpectedValue);
-            }
-
-            final long endTime = System.nanoTime();
-            System.out.println("Computation time: " + (endTime - startTime) / 1000000000.0 + "s");
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        } finally {
-            Decider.shutDownThreads();
-        }
     }
 }

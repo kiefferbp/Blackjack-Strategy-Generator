@@ -8,6 +8,8 @@ import java.util.concurrent.Future;
  * Created by Brian on 1/30/2017.
  */
 public class GUI {
+    private static final int SIMULATION_COUNT = 1000000;
+
     private JComboBox<String> constructPlayerDropdown() {
         final JComboBox<String> box = new JComboBox<>();
 
@@ -70,7 +72,14 @@ public class GUI {
         frame.pack();
         frame.setVisible(true);
 
-        final Decider d = new Decider(400, 1.0);
+        final Rule r = new RuleBuilder()
+                .setDeckCount(4)
+                .setPenetrationValue(1.0)
+                .setDealerHitsSoft17(false)
+                .setCanSurrender(false)
+                .setMaxSplitHands(4)
+                .build();
+        final Decider d = new Decider(r, SIMULATION_COUNT);
         solveButton.addActionListener((e) -> {
             new Thread(() -> {
                 // get the info required to build a scenario
@@ -97,7 +106,7 @@ public class GUI {
 
                 try {
                     final long startTime = System.nanoTime();
-                    final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true);
+                    final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true, true);
                     final long endTime = System.nanoTime();
                     status.setText(scenario + " best strategy: " + p.get(Decision.class) + " (" + p.get(Double.class) + ")");
                     System.out.println("Computation time: " + (endTime - startTime) / 1000000000.0 + "s");

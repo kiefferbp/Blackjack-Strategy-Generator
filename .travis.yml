@@ -1,8 +1,17 @@
 language: java
 sudo: true
-jdk:
-- oraclejdk8
 before_install:
 - chmod +x gradlew
-script:
-- ./gradlew check -i
+matrix:
+  include:
+    - jdk: oraclejdk8
+      env: TEST="test.HardHandTest"
+    - jdk: oraclejdk8
+      env: TEST="test.SoftHandTest1"
+    - jdk: oraclejdk8
+      env: TEST="test.SoftHandTest2"
+    - jdk: oraclejdk8
+      env: TEST="test.SoftHandTest3"
+    - jdk: oraclejdk8
+      env: TEST="test.SurrenderTest"
+script: ./gradlew test -i --tests $TEST

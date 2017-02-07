@@ -7,7 +7,7 @@ public class Pair<U, V> {
     private U first;
     private V second;
 
-    Pair(U first, V second) {
+    public Pair(U first, V second) {
         if (first.getClass().equals(second.getClass())) {
             throw new IllegalArgumentException();
         }
