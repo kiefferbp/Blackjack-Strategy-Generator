@@ -89,6 +89,8 @@ public class Player {
 
     public void resetHand() {
         cards.clear();
+        cachedPlayerValue = 0;
+        cachedPlayerSoftness = false;
         aceCount = 0;
     }
 

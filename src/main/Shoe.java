@@ -73,7 +73,6 @@ public class Shoe {
     public Card removeCardWithMaxValue(int maxValue) {
         final List<Card> cardsWithinRange = new ArrayList<>();
         int cardCountWithinRange = 0;
-        cardsWithinRange.add(Card.ACE);
 
         for (Card card : Card.values()) {
             if (card.getValue() <= maxValue || card.equals(Card.ACE)) {

@@ -172,7 +172,7 @@ public class Decider {
 
             player.addCard(randomCard);
         }
-        
+
         return new Pair<>(shoe, player);
     }
 
