@@ -14,4 +14,6 @@ matrix:
       env: TEST="test.H16vTNSTest"
     - jdk: oraclejdk8
       env: TEST="test.SplittingEights"
+    - jdk: oraclejdk8
+      env: TEST="test.SplittingNines"
 script: ./gradlew test -i --tests $TEST
