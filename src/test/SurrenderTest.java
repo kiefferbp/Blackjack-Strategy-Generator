@@ -70,7 +70,7 @@ public class SurrenderTest {
         final Scenario scenario = param.getKey();
         final Decision bestDecision = param.getValue();
 
-        final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true, true);
+        final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario);
 
         assertTrue("We should " + bestDecision + " on " + scenario, bestDecision.equals(p.get(Decision.class)));
     }

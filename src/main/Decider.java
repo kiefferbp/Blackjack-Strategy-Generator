@@ -285,6 +285,13 @@ public class Decider {
      * @throws Exception
      */
     private Double getExpectedDecisionValue(Decision decision, Scenario scenario, Map<Scenario, Double> map, Semaphore semaphore) throws Exception {
+        semaphore.acquire();
+
+        if (map.containsKey(scenario)) {
+            semaphore.release();
+            return map.get(scenario);
+        }
+
         final Callable<Double> task = () -> {
             double unitsWon = 0;
             for (int i = 0; i < Math.ceil(simulationCount / threadCount); i++) {
@@ -404,7 +411,7 @@ public class Decider {
         }
 
         final double expectedWinnings = totalUnitsWon / (threadCount * Math.ceil(simulationCount / threadCount));
-        System.out.println(decision + " result (" + scenario + "): " + expectedWinnings);
+        //System.out.println(decision + " result (" + scenario + "): " + expectedWinnings);
         map.put(scenario, expectedWinnings);
         semaphore.release();
         return expectedWinnings;
@@ -421,13 +428,6 @@ public class Decider {
      */
     private double getExpectedHitValue(Scenario scenario) throws Exception {
         final Semaphore hitSemaphore = hitSemaphoreMap.get(scenario);
-        hitSemaphore.acquire();
-
-        if (expectedHitMap.get(scenario) != null) {
-            hitSemaphore.release();
-            return expectedHitMap.get(scenario);
-        }
-
         return getExpectedDecisionValue(Decision.HIT, scenario, expectedHitMap, hitSemaphore);
     }
 
@@ -444,13 +444,6 @@ public class Decider {
      */
     private double getExpectedStandValue(final Scenario scenario) throws Exception {
         final Semaphore standSemaphore = standSemaphoreMap.get(scenario);
-        standSemaphore.acquire();
-
-        if (expectedStandMap.get(scenario) != null) {
-            standSemaphore.release();
-            return expectedStandMap.get(scenario);
-        }
-
         return getExpectedDecisionValue(Decision.STAND, scenario, expectedStandMap, standSemaphore);
     }
 
@@ -466,11 +459,9 @@ public class Decider {
      */
     private double getExpectedSplitValue(Scenario scenario) throws Exception {
         final Semaphore splitSemaphore = splitSemaphoreMap.get(scenario);
-        splitSemaphore.acquire();
 
         if (!scenario.isPair) { // can't split
             expectedSplitMap.put(scenario, (double) Integer.MIN_VALUE);
-            splitSemaphore.release();
             return Integer.MIN_VALUE;
         }
 
@@ -489,13 +480,6 @@ public class Decider {
      */
     private double getExpectedDoubleValue(Scenario scenario) throws Exception {
         final Semaphore doubleSemaphore = standSemaphoreMap.get(scenario);
-        doubleSemaphore.acquire();
-
-        if (expectedDoubleMap.get(scenario) != null) {
-            doubleSemaphore.release();
-            return expectedDoubleMap.get(scenario);
-        }
-
         return getExpectedDecisionValue(Decision.DOUBLE, scenario, expectedDoubleMap, doubleSemaphore);
     }
 
@@ -511,7 +495,7 @@ public class Decider {
      * @throws Exception
      */
     public Map<Decision, Double> computeExpectedValues(Scenario scenario) throws Exception {
-        if (scenarioExpectedValues.get(scenario) != null) {
+        if (scenarioExpectedValues.containsKey(scenario)) {
             return scenarioExpectedValues.get(scenario);
         }
 
@@ -521,14 +505,6 @@ public class Decider {
         expectedValueMap.put(Decision.SPLIT, getExpectedSplitValue(scenario));
         expectedValueMap.put(Decision.DOUBLE, getExpectedDoubleValue(scenario));
         expectedValueMap.put(Decision.SURRENDER, -0.5);
-        /*if (canDoubleDown) {
-            expectedValueMap.put(Decision.DOUBLE, getExpectedDoubleValue(scenario));
-        }
-
-        if (firstMove && canSurrender) {
-            expectedValueMap.put(Decision.SURRENDER, -0.5);
-        }*/
-
         scenarioExpectedValues.put(scenario, expectedValueMap);
 
         return expectedValueMap;
@@ -543,7 +519,7 @@ public class Decider {
      * @return a decision-value pair
      * @throws Exception
      */
-    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean canDoubleDown, boolean firstMove) throws Exception {
+    private Pair<Decision, Double> computeBestScenarioResult(Scenario scenario, boolean canDoubleDown, boolean firstMove) throws Exception {
         final Map<Decision, Double> expectedValueMap = computeExpectedValues(scenario);
         Decision bestExpectedDecision = null;
         double bestExpectedValue = Integer.MIN_VALUE;
@@ -552,6 +528,8 @@ public class Decider {
             final Decision entryDecision = entry.getKey();
             final double entryExpectedValue = entry.getValue();
 
+            // ignore decisions that we can't make
+            // for example, one can't surrender after taking a third card
             if ((!canDoubleDown && entryDecision.equals(Decision.DOUBLE)) ||
                     ((!canSurrender || !firstMove) && entryDecision.equals(Decision.SURRENDER))) {
                 continue;
@@ -564,5 +542,9 @@ public class Decider {
         }
 
         return new Pair<>(bestExpectedDecision, bestExpectedValue);
+    }
+
+    public Pair<Decision, Double> computeBestScenarioResult(Scenario scenario) throws Exception {
+        return computeBestScenarioResult(scenario, true, true);
     }
 }
