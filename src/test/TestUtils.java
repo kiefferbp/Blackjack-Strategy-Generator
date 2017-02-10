@@ -52,7 +52,7 @@ public class TestUtils {
         final Decision bestDecision = maxOverMap(decisionMap).get(Decision.class);
         final double bestValue = maxOverMap(decisionMap).get(Double.class);
 
-        final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario, true, true);
+        final Pair<Decision, Double> p = d.computeBestScenarioResult(scenario);
         final Map<Decision, Double> scenarioExpectedValues = d.computeExpectedValues(scenario);
 
         for (Map.Entry<Decision, Double> entry : scenarioExpectedValues.entrySet()) {

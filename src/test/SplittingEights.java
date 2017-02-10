@@ -31,7 +31,7 @@ public class SplittingEights {
                         .setSoftFlag(false)
                         .setPairFlag(true)
                         .build();
-                final Pair<Decision, Double> p = d.computeBestScenarioResult(p8svDealerCardScenario, true, true);
+                final Pair<Decision, Double> p = d.computeBestScenarioResult(p8svDealerCardScenario);
                 final Decision bestDecision = p.get(Decision.class);
 
                 assertTrue("We should split 8's versus " + dealerCard, bestDecision.equals(Decision.SPLIT));

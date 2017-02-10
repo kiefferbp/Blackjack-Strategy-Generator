@@ -24,8 +24,6 @@ public class SoftHandTest {
     private static final Decider d = new Decider(r, SIMULATION_COUNT);
 
     @Parameterized.Parameters
-    // I would add more test cases here, but two cases causes this to exceed 50 minutes (the limit for Travis CI jobs).
-    // As a result, I am splitting up the soft test cases into multiple cases and running each class as a job.
     public static Iterable<?> data() {
         // source: http://wizardofodds.com/games/blackjack/appendix/1/
         final Map<Scenario, Map<Decision, Double>> paramMap = new HashMap<>();
