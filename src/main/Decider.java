@@ -22,11 +22,7 @@ public class Decider {
     private Map<Scenario, Semaphore> doubleSemaphoreMap = new HashMap<>();
 
     // rules
-    private int deckCount;
-    private double penetrationValue;
-    private boolean dealerHitsSoft17;
-    private boolean canSurrender;
-    private int maxSplitHands;
+    private Rule rule;
 
     // other params
     private int simulationCount;
@@ -45,13 +41,8 @@ public class Decider {
             throw new IllegalStateException("ExecutorService has been shut down already");
         }
 
-        this.deckCount = rule.getDeckCount();
-        this.penetrationValue = rule.getPenetrationValue();
-        this.dealerHitsSoft17 = rule.dealerHitsSoft17();
-        this.canSurrender = rule.canSurrender();
-        this.maxSplitHands = rule.getMaxSplitHands();
+        this.rule = rule;
         this.simulationCount = simulationCount;
-        this.statusListeners = new ArrayList<>();
 
         // init the semaphore maps
         // some don't make sense and are never used, but let's go with it
@@ -111,7 +102,7 @@ public class Decider {
         final Card dealerCard = scenario.dealerCard;
         final boolean targetIsSoft = scenario.isPlayerSoft;
 
-        final Shoe shoe = new Shoe(deckCount, penetrationValue);
+        final Shoe shoe = new Shoe(rule.getDeckCount(), rule.getPenetrationValue());
         final Player player = new Player(shoe);
 
         final Callable<?> resetTask = () -> {
@@ -225,7 +216,8 @@ public class Decider {
         dealer.addCard(secondDealerCard);
 
         // play out the dealer's hand
-        while (dealer.getHandValue() < 17 || (dealer.getHandValue() == 17 && dealer.handIsSoft() && dealerHitsSoft17)) {
+        while (dealer.getHandValue() < 17 ||
+                (dealer.getHandValue() == 17 && dealer.handIsSoft() && rule.dealerHitsSoft17())) {
             dealer.hit();
         }
 
@@ -331,7 +323,8 @@ public class Decider {
                         if (player.getHandValue() > 21) {
                             unitsWon -= 2;
                         } else {
-                            unitsWon += 2 * simulateStanding(player, dealer, shoe).getWinAmount();
+                            final PlayResult bestPlayResult = simulateStanding(player, dealer, shoe);
+                            unitsWon += 2 * bestPlayResult.getWinAmount();
                         }
 
                         break;
@@ -340,7 +333,9 @@ public class Decider {
                         shoe.rebuildShoe();
 
                         // get the correct player card
-                        final Card playerCard = Card.getCardWithValue(scenario.playerValue / 2);
+                        final Card playerCard = (scenario.playerValue == 12 && scenario.isPlayerSoft)
+                                ? Card.ACE // a soft 12 is a pair of aces
+                                : Card.getCardWithValue(scenario.playerValue / 2);
                         shoe.removeCard(playerCard);
                         shoe.removeCard(playerCard);
                         shoe.removeCard(dealerCard);
@@ -369,7 +364,8 @@ public class Decider {
 
                             // note: check topCard.getValue() == playerCard.getValue() instead of
                             // topCard.equals(playerCard) for 10/J/Q/K in particular
-                            if (topCard.getValue() == playerCard.getValue() && handCount < maxSplitHands) {
+                            if (topCard.getValue() == playerCard.getValue() &&
+                                    handCount < rule.getMaxSplitHands() && !playerCard.equals(Card.ACE)) {
                                 // split the hand
                                 final Player newPlayerHand = new Player(shoe);
                                 newPlayerHand.addCard(topCard);
@@ -531,7 +527,7 @@ public class Decider {
             // ignore decisions that we can't make
             // for example, one can't surrender after taking a third card
             if ((!canDoubleDown && entryDecision.equals(Decision.DOUBLE)) ||
-                    ((!canSurrender || !firstMove) && entryDecision.equals(Decision.SURRENDER))) {
+                    ((!rule.canSurrender() || !firstMove) && entryDecision.equals(Decision.SURRENDER))) {
                 continue;
             }
 
